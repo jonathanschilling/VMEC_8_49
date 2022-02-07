@@ -119,12 +119,12 @@ $ECHO  "  Machine ID = $MACHINE_ID"
 	UNZIP="unzip"
 	MPI_COMPILE=`which mpif90`
 	MPI_LINK=$MPI_COMPILE
-      
+
 case $computer in
 winnt)
 	precomp="cc -C -P -w -DWINNT"
 	;;
-cray) 
+cray)
 	FLAGS_D="-e D -e I"
 	FREE_FORM="-f free"
 	NCARGSYM="f90 -O 3 $NCAR "
@@ -346,16 +346,16 @@ fi
 	;;
 #linux or linux64
 linux*)
-	NETCDF_DIREC="/usr/local/netcdf-3.5.0"
-	COMPILE="lf95"
-	LINK="lf95 --staticlink"
+	NETCDF_DIREC="/usr/lib"
+	COMPILE="gfortran"
+	LINK="gfortran"
 	FREE_FORM="--nfix"
 	FLAGS_R="--o2 -X9"
 	FLAGS_D="-g --chk a,e,s,u --chkglobal"
 	precomp=$PREPROC"-traditional -DLINUX -DNEED_BLAS"
-	PGLIB="/usr/local/pgplot/libpgplot.a"
+	PGLIB="/usr/lib/libpgplot.so"
 	PRINTFLAG="-O5"
-	NETCDF_INC=""
+	NETCDF_INC="/usr/include"
 if [ $MACHINE_ID = "sherlock.ph.utexas.edu" ] || [ $MACHINE_ID = "archive" ]
 then
 	LOCAL_MAKE="gmake"
@@ -372,11 +372,11 @@ then
 	LIBNETCDF="libnetcdf.a"
 	NETCDF_INC=$NETCDF_DIREC/include
 	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
-	COMPRESS="gzip" 
-	ZIP="zip" 
-	UNCOMPRESS="gunzip" 
-	UNZIP="unzip" 
-elif [ $MACHINE_ID = "fuslwd" ] 
+	COMPRESS="gzip"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+elif [ $MACHINE_ID = "fuslwd" ]
 then
 	LIBNETCDF="libnetcdf.a"
 	NETCDF_DIREC="/usr/local/netcdf"
@@ -411,7 +411,7 @@ then
 #       MY_HOME="/usr/local/f95i"
 	LIB="-lblas -llapack"
 	NETCDF_DIREC="/usr/local/lib"
-	COMPILE="gfortran"  
+	COMPILE="gfortran"
 	if [ $COMPILE = "g95" ]
 	then
 	  LIBNETCDF="libnetcdf.a"
@@ -469,25 +469,25 @@ then
 	ZIP="zip"
 	UNCOMPRESS="gunzip"
 	UNZIP="unzip"
-elif [ $MACHINE_ID = "euler01.ciemat.es" ] || [ $MACHINE_ID = "euler02.ciemat.es" ] 
-then 
+elif [ $MACHINE_ID = "euler01.ciemat.es" ] || [ $MACHINE_ID = "euler02.ciemat.es" ]
+then
 	LOCAL_MAKE="gmake"
-	COMPILE="ifort" 
-	LINK="ifort" 
+	COMPILE="ifort"
+	LINK="ifort"
 	#   LIB="-L/opt/intel/mkl/10.0.3.020/lib/em64t  -lmkl_lapack -lmkl -lguide -lpthread"
 	LIB="-L/opt/intel/mkl/10.0.3.020/lib/em64t  -lmkl_intel_lp64 -lmkl_sequential -lmkl_lapack -lmkl_core "
 	#   LIB="-L/opt/intel/mkl/10.0.3.020/lib/em64t  -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_lapack -lguide -lmkl_core -lpthread "
-	FREE_FORM="-free" 
-	FLAGS_R="-O3 " 
+	FREE_FORM="-free"
+	FLAGS_R="-O3 "
 	#  FLAGS_R="-O2 -vec-report0"
-	FLAGS_D="-g" 
+	FLAGS_D="-g"
 	PREPROC="cpp -E -P -C "
-	#  NETCDF_DIREC="/soft/netcdf-3.6.6" 
-	NETCDF_DIREC="/soft/netcdf-4.0.1-intel" 
-	COMPRESS="gzip" 
-	ZIP="zip" 
-	UNCOMPRESS="gunzip" 
-	UNZIP="unzip" 
+	#  NETCDF_DIREC="/soft/netcdf-3.6.6"
+	NETCDF_DIREC="/soft/netcdf-4.0.1-intel"
+	COMPRESS="gzip"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
 	precomp=$PREPROC"-traditional -DLINUX -DNEED_BLAS"
 elif [ $MACHINE_ID = "siesta.ornl.gov" ] || [ $MACHINE_ID = "swim.ornl.gov" ]
 then
@@ -519,7 +519,7 @@ then
 #	LIB=$LIB" -L$FFTW_LIB -lfftw3"
 	FLAGS_R="-O3 -I../Sources"
 	FLAGS_D="-g -I../Sources"
-	FREE_FORM="" 
+	FREE_FORM=""
 elif [ "$nersc" = "hopper" ]
 then
         COMPILE="ftn"
@@ -715,9 +715,9 @@ then
 	   # Added by S. Lazerson 1/27/11
 	   COMPILE="ifort"
 	   LINK="$COMPILE"
-	   FREE_FORM="-free" 
+	   FREE_FORM="-free"
 	   FLAGS_R="-O2 -vec_report0"
-	   FLAGS_D="-g" 
+	   FLAGS_D="-g"
 	   LIBNETCDF="libnetcdf.a"
 	   NETCDF_DIREC=$NETCDFHOME
 	   NETCDF_INC=$NETCDF_DIREC/include
@@ -852,10 +852,10 @@ elif [ $MACHINE_ID = "logjam.gat.com" ]
 then
 #put in a warning if NONE exists
 	C1=0 ; C2=0 ; C3=0
-	C1=`expr "$FC" : /opt/pgi/linux86-64/10.1/bin/pgf90` 
+	C1=`expr "$FC" : /opt/pgi/linux86-64/10.1/bin/pgf90`
 	C2=`expr "$FC" : /opt/intel/Compiler/11.1/059/bin/intel64/ifort`
         C3=`expr "$FC" : /usr/bin/gfortran`
-        C1=`expr "$FC" : ".*/pgf90"` 
+        C1=`expr "$FC" : ".*/pgf90"`
         C2=`expr "$FC" : ".*/ifort"`
         C3=`expr "$FC" : ".*/gfortran"`
 	precomp="$precomp -DLINUX"
@@ -888,7 +888,7 @@ then
 	  BLACS_PATH=$MKL
    	  SCALAPACK_LIB=$BLACS_PATH" -lmkl_scalapack_lp64"
 	  BLACS_LIB="-lmkl_blacs_intelmpi_lp64 -lmkl_intel_lp64"
-	  BLACS_LIB=$BLACS_LIB" -lmkl_sequential -lpthread" 
+	  BLACS_LIB=$BLACS_LIB" -lmkl_sequential -lpthread"
 
 	elif  [ $C1 != 0 ]
 	then
@@ -904,7 +904,7 @@ then
           NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
           LIB="-L $F90HOME/lib -llapack -lblas"
 	else
-          $ECHO "None of C1-C3 compilers can be found: installation halted." 
+          $ECHO "None of C1-C3 compilers can be found: installation halted."
           $ECHO "Load a module for a fortran compiler - use module avail"
           exit
 	fi
@@ -912,7 +912,7 @@ then
 	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
 	MPI_RUN="mpirun -np \$2 \$MY_HOME/xstellopt \$1"
     [ -n $MPI_COMPILE ] && `module load mpich2`
-#END	 "logjam.gat.com" 
+#END	 "logjam.gat.com"
 
 elif [ "$jacquard" = "jacin" ]
 then
@@ -930,7 +930,7 @@ elif [ $MACHINE_ID = "kiwi" ]
 then
 	NETCDF_DIREC=/usr/local
 	LIB="-lblas -llapack"
-	
+
 # Section for computers at Auburn University. JDH Added 2011-04-25
 #    Added recon2 2011-11-28
 #     (Converted from Solaris to Linux)
@@ -1050,14 +1050,14 @@ esac
 #   End platform identification
 #   Next, query user about type of update/distribution/make he desires
 #   First ascertain that the required installation ZIP file (stellinstall.zip)
-#   or compressed tar file (stellunix.tar.Z) exists in the current user directory. 
+#   or compressed tar file (stellunix.tar.Z) exists in the current user directory.
 #   "Unmask" dependency files that may already exist from prior installation.
 #   Set umask so ONLY the user and his group can read files (user can write to
-#   the "Sources" directory files, too...) but should NOT write over certain 
+#   the "Sources" directory files, too...) but should NOT write over certain
 #   "make" files and object-file listings.
 #---------------------------------------------------------------
 $ECHO
-if [ -s $ZIP_FILE ] 
+if [ -s $ZIP_FILE ]
 then
     $ECHO "unzipping stellinstall"
     $UNZIP -oqUu $ZIP_FILE
@@ -1093,7 +1093,7 @@ then
    VERSION="debug"
 else
    VERSION="release"
-fi      
+fi
 
 #---------------------------------------------------------------
 #   Next, query user about executables to be made
@@ -1119,7 +1119,7 @@ fi
 #   Next, determine if NETCDF directory is there and netcdf.inc can be found
 #---------------------------------------------------------------
 $ECHO
-if [ -s $NETCDF_INC/netcdf.inc ] 
+if [ -s $NETCDF_INC/netcdf.inc ]
 then
    NETCDF_EXISTS=TRUE
    $ECHO
@@ -1140,7 +1140,7 @@ then
       USE_NETCDF="-DNETCDF"
       $ECHO '  Compiling with netcdf-support!'
       precomp=$precomp" -DNETCDF"
-   fi      
+   fi
 elif [ "$nersc" = "franklin" ]
 then
       USE_NETCDF="-DNETCDF"
@@ -1180,7 +1180,7 @@ then
      MPI_LINK=""
      MPI_COMPILE=""
      $ECHO '  Compiling without MPI-support!'
-   fi     
+   fi
 fi
 $ECHO
 #---------------------------------------------------------------
@@ -1387,12 +1387,12 @@ do
          BANNER_DBG="Beginning debug compilation and archiving of $FILES"
          [ -n "$MPI_COMPILE" ] && COMPILE1=$MPI_COMPILE
   ;;
-  propack)   
+  propack)
          EXE_FILE="propack.a"
          LINK_FILE=$ARCHIVE
          BANNER_REL="Beginning release compilation and archiving of $FILES"
          BANNER_DBG="Beginning debug compilation and archiving of $FILES"
-         [ -n "$MPI_COMPILE" ] && COMPILE1=$MPI_COMPILE  
+         [ -n "$MPI_COMPILE" ] && COMPILE1=$MPI_COMPILE
   ;;
   animec)
 $ECHO "$MPI_COMPILE"
@@ -1448,7 +1448,7 @@ $ECHO "$MPI_LIB"
   prout) DIR="PLOTTER"
          LINK_FILE=$NCARGSYM" -o"
          LINK_LIB="$LINK_LIB $NCARGLIB"
-  ;;  
+  ;;
   pgprout)
 $ECHO PGPLOT_DIR=$PGPLOT_DIR
    if [ ! -z "$PGALL" ]
@@ -1760,7 +1760,7 @@ EOF
 chmod u+x-w makefile
 
 #---------------------------------------------------------------
-#   Create recursively-called make file (make$FILES) to go into 
+#   Create recursively-called make file (make$FILES) to go into
 #   $DIR/Release  or $DIR/Debug directories
 #   Note: because some compilers do not recognize .f90 extension,
 #   the make file copies the *.f90 files to *.f and compiles them
@@ -1810,7 +1810,7 @@ include \$(OBJLIST)
 .SUFFIXES :
 .SUFFIXES : .f .f90 .o
 
-$EXE_FILE : \$(ObjectFiles) 
+$EXE_FILE : \$(ObjectFiles)
 	\$(LINK) \$@ \$(ObjectFiles)
 	\$(CLEAN_ARCH)
 
