@@ -1,0 +1,18 @@
+# Microsoft Developer Studio Generated Dependency File, included by MAKEGRID.mak
+
+makegrid.o : \
+      ../../LIBSTELL/Release/safe_open_mod.o \
+      makegrid_global_mod.o \
+      write_mgrid.o 
+      
+
+makegrid_global_mod.o : \
+      ../../LIBSTELL/Release/stel_kinds.o
+      
+
+write_mgrid.o : \
+      ../../LIBSTELL/Release/biotsavart.o \
+      ../../LIBSTELL/Release/ezcdf.o \
+      ../../LIBSTELL/Release/mgrid_mod.o \
+      ../../LIBSTELL/Release/safe_open_mod.o 
+      

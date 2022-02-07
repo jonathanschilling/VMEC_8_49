@@ -1,0 +1,29 @@
+# Microsoft Developer Studio Generated Dependency File, included by V3RFUN.mak
+
+diagnostic_dot.o : \
+      ../../LIBSTELL/Release/bsc_T.o \
+      ../../LIBSTELL/Release/diagnostic_T.o \
+      ../../LIBSTELL/Release/safe_open_mod.o \
+      ../../LIBSTELL/Release/stel_constants.o \
+      ../../LIBSTELL/Release/stel_kinds.o 
+      
+
+v3rfun.o : \
+      ../../LIBSTELL/Release/bsc_T.o \
+      ../../LIBSTELL/Release/biotsavart.o \
+      ../../LIBSTELL/Release/bsc_cdf.o \
+      ../../LIBSTELL/Release/diagnostic_cdf.o \
+      ../../LIBSTELL/Release/diagnostic_T.o \
+      ../../LIBSTELL/Release/ezcdf.o \
+      ../../LIBSTELL/Release/stel_constants.o \
+      ../../LIBSTELL/Release/stel_kinds.o \
+      ../../LIBSTELL/Release/v3_utilities.o \
+      diagnostic_dot.o \
+      v3rfun_data.o 
+
+
+v3rfun_data.o : \
+      ../../LIBSTELL/Release/bsc_T.o \
+      ../../LIBSTELL/Release/diagnostic_T.o \
+      ../../LIBSTELL/Release/stel_kinds.o 
+      

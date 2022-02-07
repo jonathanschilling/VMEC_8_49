@@ -1,0 +1,65 @@
+# Microsoft Developer Studio Generated Dependency File, included by V3RFUN.mak
+
+coils_dot.o : \
+      ../../LIBSTELL/Debug/bsc_T.o \
+      ../../LIBSTELL/Debug/safe_open_mod.o \
+      ../../LIBSTELL/Debug/stel_constants.o \
+      ../../LIBSTELL/Debug/stel_kinds.o 
+      
+
+diagnostic_dot.o : \
+      ../../LIBSTELL/Debug/bsc_T.o \
+      ../../LIBSTELL/Debug/diagnostic_T.o \
+      ../../LIBSTELL/Debug/safe_open_mod.o \
+      ../../LIBSTELL/Debug/stel_constants.o \
+      ../../LIBSTELL/Debug/stel_kinds.o 
+      
+
+intpol_dot.o : \
+      ../../LIBSTELL/Debug/bsc_T.o \
+      ../../LIBSTELL/Debug/ezcdf.o \
+      ../../LIBSTELL/Debug/intpol_cdf.o \
+      ../../LIBSTELL/Debug/ip_beamline.o \
+      ../../LIBSTELL/Debug/math_utilities.o \
+      ../../LIBSTELL/Debug/stel_constants.o \
+      ../../LIBSTELL/Debug/stel_kinds.o \
+      v3rfun_data.o \
+      vfun_ptr_links.o 
+      
+
+v3rfun.o : \
+      ../../LIBSTELL/Debug/bsc_T.o \
+      ../../LIBSTELL/Debug/bsc_cdf.o \
+      ../../LIBSTELL/Debug/diagnostic_cdf.o \
+      ../../LIBSTELL/Debug/diagnostic_T.o \
+      ../../LIBSTELL/Debug/ezcdf.o \
+      ../../LIBSTELL/Debug/intpol_cdf.o \
+      ../../LIBSTELL/Debug/ip_beamline.o \
+      ../../LIBSTELL/Debug/signal_cdf.o \
+      ../../LIBSTELL/Debug/signal_T.o \
+      ../../LIBSTELL/Debug/stel_constants.o \
+      ../../LIBSTELL/Debug/stel_kinds.o \
+      ../../LIBSTELL/Debug/v3_utilities.o \
+      coils_dot.o \
+      diagnostic_dot.o \
+      intpol_dot.o \
+      v3rfun_data.o \
+      write_response.o 
+      
+
+v3rfun_data.o : \
+      ../../LIBSTELL/Debug/bsc_T.o \
+      ../../LIBSTELL/Debug/diagnostic_T.o \
+      ../../LIBSTELL/Debug/stel_kinds.o 
+      
+
+vfun_ptr_links.o : \
+      ../../LIBSTELL/Debug/ip_beamline.o 
+      
+
+write_response.o : \
+      ../../LIBSTELL/Debug/bsc_cdf.o \
+      ../../LIBSTELL/Debug/ezcdf.o \
+      ../../LIBSTELL/Debug/read_response_nompi.o \
+      v3rfun_data.o 
+      

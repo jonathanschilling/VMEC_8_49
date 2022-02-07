@@ -1,0 +1,2089 @@
+#!/bin/sh
+#
+#Stellarator configuration file
+#
+#Written by S. P. Hirshman (03/01/02), with lots of help from friends...
+#Based on the original vmec_setup script of bygone days.
+#
+#                           M A I N   D I R E C T O R Y (S T E L L A R A T O R , T Y P I C A L L Y)
+#
+#---------------------------------------------------------------------------------------------------------------------------------------------
+#                      |           vmec_setup => makes all directories, makefiles    |        |         |        |         |         |
+#                      |                                                             |        |         |        |         |         |
+#                      |            |           |            |           |           |        |         |        |         |         |
+#                      |            |           |            |           |           |        |         |        |         |         |
+#                  LIBSTELL        VMEC      STELLOPT   BOOZ_XFORM    NESCOIL      BNORM    BOOTSJ   J_INVAR    PROUT  PGPROUT    BD_MATCH
+#                  ---------    ---------  ----------    -------       -----       -----    ------   -------    -----  -------    --------
+#  make release => libstell       xvmec      xstellopt    xbooz        xcoil      xbnorm   xbootsj xj_invariant xprout xpgprout   x_bdmatch
+#                             |            |            |           |          |         |          |            |            |
+#                             |            |            |           |          |         |          |            |            |
+#                             |            |            |           |          |         |          |            |            |
+#                             |            |            |           |          |         |          |            |            |
+#                            DKES         COBRA      MAKEGRID    COILOPT    DESCUR     V3RFUN     V3POST       V3FITA     INDUCTANCE
+#                            ----         -----      -------     -------    -------    -------    ------      ---------   ----------
+#                            xdkes,      xcobra,      xgrid     xcoilopt    xcurve     xv3rfun    xv3post      xv3fita      xinduct
+#                          xdkes_prep  xcobravmec              xcoilgeom    xdes_plot
+#
+
+#Identify hardware platform
+uname -a | grep tern  && exit 1
+uname -a | grep AIX    && computer=risc6000
+uname -a | grep CRAY   && computer=cray
+uname -a | grep cray   && computer=cray
+uname -a | grep ULTRIX && computer=decstation
+uname -a | grep IRIX   && computer=ccf
+uname -a | grep IRIX64 && computer=orig2000
+uname -a | grep OSF1   && computer=osf1
+uname -a | grep HP-UX  && computer=HPUX
+uname -a | grep SunOS  && computer=Sun
+uname -a | grep SX-5   && computer=SX-5
+uname -a | grep Linux  && computer=linux
+uname -a | grep Linux  | grep x86_64 && computer=linux64
+uname -a | grep rfplasma && computer=risc6000
+uname -a | grep Darwin  && computer=macosx
+uname -n | grep ganesh  && beo_cluster=pppl
+uname -n | grep ellis  && beo_cluster=pppl
+uname -n | grep fcc  && beo_cluster=pppl
+uname -n | grep sunfire && beo_cluster=pppl
+uname -n | grep jacin && jacquard=jacin
+uname -n | grep davinci && computer=davinci
+#uname -n | grep nid && nersc=franklin
+#uname -n | grep freedom && nersc=franklin
+uname -n | grep hopper && nersc=hopper
+uname -n | grep cvrsvc && nersc=carver
+
+
+ZIP_FILE=stellinstall.zip
+INIT_UMASK=`umask`
+INSTALL_DIR=$HOME
+MY_HOME=$INSTALL_DIR/bin
+MACHINE_ID=`uname -n`
+uname -a | grep clus | grep x86_64 && MACHINE_ID=ipp_stel_cluster64
+uname -a | grep clus | grep i[3-6]86 && MACHINE_ID=ipp_stel_cluster32
+[ "$MACHINE_ID" = "falcon0" ] && MY_HOME=$INSTALL_DIR"/falcon"
+ECHO="echo"
+[ $computer = "linux" ] && [ $MACHINE_ID != "ipp_stel_cluster32" ] && ECHO="echo -e"
+
+[ $MACHINE_ID = "ipp_stel_cluster64" ] && MY_HOME=/net/s01/$LOGNAME/bin
+[ $MACHINE_ID = "ipp_stel_cluster64" ] && INSTALL_DIR=/net/s01/$LOGNAME
+[ $MACHINE_ID = "ipp_stel_cluster32" ] && MY_HOME=/net/s01/$LOGNAME/bin
+[ $MACHINE_ID = "ipp_stel_cluster32" ] && INSTALL_DIR=/net/s01/$LOGNAME
+[ $MACHINE_ID = "rzgate" ] && [ $DOMAIN = "rzg.mpg.de" ] && INSTALL_DIR=$HOME/$SYS
+[ $MACHINE_ID = "rzgate" ] && [ $DOMAIN = "rzg.mpg.de" ] && MY_HOME=$HOME/$SYS/bin
+
+
+$ECHO Script for generating STELLARATOR OPTIMIZATION SUITE executables
+
+
+#---------------------------------------------------------------
+# Define the Platform Type on which the computation is to be done ...
+$ECHO  "  Computer = $computer"
+$ECHO  "  Machine ID = $MACHINE_ID"
+#---------------------------------------------------------------
+	FLAGS_R=""
+	FLAGS_D="-g"
+	PRINTFLAG="-O"
+	STATIC_FLAG=""
+	LINK="f90"
+	MPI_LINK=""
+	MPI_COMPILE=""
+	MPI_RUN=""
+	MPI_LIB=""
+	LOCAL_MAKE="make"
+	LIBDIR="libstell_dir"
+	MODULE_PATH="-I"
+	ARCHIVE="ar -ruv"
+	RANLIB=""
+	COMPILE="f90"
+	NCARGSYM="f90 $NCAR"
+	NCARGLIB=""
+	LIB=""
+	FREE_FORM=""
+	FIXED_FORM=""
+	PGLIB=""
+	MKDIR="mkdir -m 755"
+	processors_per_node=1
+	AWK="awk"
+	LOG_OR="||"
+	LOG_AND="\\\&\\\&"
+	PREPROC="/lib/cpp -P -C "
+	NETCDF_DIREC="/usr/local"
+	LIBNETCDF="libnetcdf.a"
+	NETCDF_INC=$NETCDF_DIREC/include
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	FFTW_INC="/usr/include"
+	FFTW_LIB="/usr/lib"
+	COMPRESS="compress"
+	ZIP="zip"
+	UNCOMPRESS="uncompress"
+	UNZIP="unzip"
+	MPI_COMPILE=`which mpif90`
+	MPI_LINK=$MPI_COMPILE
+      
+case $computer in
+winnt)
+	precomp="cc -C -P -w -DWINNT"
+	;;
+cray) 
+	FLAGS_D="-e D -e I"
+	FREE_FORM="-f free"
+	NCARGSYM="f90 -O 3 $NCAR "
+	MODULE_PATH="-p "
+	LIB="-lsci"
+if [ $MACHINE_ID = "lonestar" ]
+then
+	precomp=$PREPROC"-DCRAY -DLONESTAR"
+	FLAGS_R="-O3 "
+elif [ $MACHINE_ID = "mcurie" ]
+then
+	precomp=$PREPROC"-DCRAY -DMCURIE"
+	FLAGS_R="-Oscalar3,vector3"
+	MPI_RUN="mpirun -np \$2 \$MY_HOME/xstellopt \$1"
+	LINK='f90 -Wl"-D permok=yes"'
+elif [ $MACHINE_ID = "phoenix" ]
+then
+	PREPROC="/opt/PE/bin/cpp -P -C "
+	precomp=$PREPROC"-DCRAY"
+	FLAGS_R="-r m -O 3,inline5"
+	NETCDF_DIREC="/apps/netcdf/prod/x1_r8"
+	LIBNETCDF="libnetcdf.a"
+	NETCDF_INC=$NETCDF_DIREC/include
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	MPI_RUN="mpirun -np \$2 \$MY_HOME/xstellopt \$1"
+	COMPILE="ftn"
+	FLAGS_D="-g"
+	LINK="ftn"
+else
+	precomp=$PREPROC"-DCRAY"
+	FLAGS_R="-Oscalar3,vector3,task2"
+	MPI_RUN="mpirun -np \$2 \$MY_HOME/xstellopt \$1"
+fi
+	;;
+risc6000)
+	trap="-C -qinit=f90ptr -qinitauto=FF -bnoquiet -qnosave -qspnans \
+-qflttrap=zero:ov:inv:en -qsigtrap"
+	FLAGS_R="-O4 -qstrict -qnoipa"
+	[ $MACHINE_ID = "cheetah48" ] && FLAGS_R="-O3 -qstrict"
+#put all single-processor machines FIRST...
+if [ $MACHINE_ID = "hirshman" ] || [ $MACHINE_ID = "fedu55" ] ||
+   [ $MACHINE_ID = "jaeger" ] || [ $MACHINE_ID = "carter" ] || [ $MACHINE_ID = "rfplasma" ]
+then
+	LIB="-lblas"
+	FLAGS_R="-qnolm $FLAGS_R"
+	FLAGS_D="-qnolm -g $trap -qextchk"
+	NETCDF_DIREC="/usr/local/netcdf-3.5.0"
+	[ $MACHINE_ID = "carter" ] && NETCDF_DIREC="/raid/usr/local/netcdf-3.5.0"
+	[ $MACHINE_ID = "rfplasma" ] && NETCDF_DIREC="/usr/local/netcdf-3.6.0-p1"
+	NCARGSYM="ncargf77"
+	PREPROC="/lib/cpp -P -C -traditional-cpp"
+elif [ $MACHINE_ID = "rzgate" ]
+then
+#LIB="-lessl -lblas"
+	LIB="-L/afs/ipp/@sys/lib -llapack-essl_P5 -lessl -lblas"
+	FLAGS_R="-qnolm $FLAGS_R"
+	FLAGS_D="-qnolm -g $trap -qextchk"
+	COMPRESS="gzip -S .Z"
+	UNCOMPRESS="gunzip -S .Z"
+	NETCDF_DIREC="/afs/ipp/home/g/geiger/@sys"
+# OLD sp-settings
+# removed -qnolm, since it seems not to be available on the sp.
+# got a compile error signal 11 with -O4 when compiling VMEC2000/Input_Output/mercier.f
+# everything works fine if mercier.f is compiled with -O2. Output from compilation with -O4 on sp xlf V10.1:
+# Calling signal handler...
+# 1586-494 (U) INTERNAL COMPILER ERROR: Signal 11.
+# 1501-511  Compilation failed for file mercier.f.
+#       FLAGS_R="-O2 -qstrict -qnoipa"
+#       FLAGS_R="$FLAGS_R"
+#       FLAGS_D="-g $trap -qextchk"
+#       NETCDF_DIREC="$HOME/$SYS"
+#       UNCOMPRESS="gunzip"
+else
+	MPI_COMPILE="mpxlf90"
+	MPI_LINK="mpxlf90 -bnoquiet"
+	MPI_RUN="poe xstellopt \$1 -procs \$2 -tasks_per_node \$proc_per_node -nodes \$numnodes -rmpool 1"
+        processors_per_node=16
+	[ `echo $MACHINE_ID | grep eagle` ] && processors_per_node=4
+	[ `echo $MACHINE_ID | grep eagle` ] && LIBNETCDF="libnetcdf_real8.a"
+	LIB="-lessl -lblas"
+#     bug in mpi library does not work with -qextchk flag...
+	FLAGS_D="-qnolm -g $trap"
+	[ "$NETCDF_DIR" != "" ] && NETCDF_DIREC=$NETCDF_DIR
+	NCARGSYM="xlf90"
+	NCARGLIB=$NCAR
+fi
+#risc compiler does not recognize .f90 suffix as default; must force it
+	NETCDF_INC=$NETCDF_DIREC/include
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	FREE_FORM="-qsuffix=f=f90 -qfree=f90"
+	FIXED_FORM="-qfixed"
+	precomp=$PREPROC"-DRISC"
+	COMPILE="xlf90"
+	LINK="xlf90 -bnoquiet"
+	FLAGS_R=$FLAGS_R" -qalias=noaryovrlp -qextname=flush"
+        FLAGS_D=$FLAGS_D" -qextname=flush"
+	STATIC_FLAG="-bnso -bI:/usr/lib/syscalls.exp"
+	;;
+ccf)
+	precomp=$PREPROC"-DIRIX"
+	FLAGS_R="-O"
+	;;
+orig2000)
+	precomp="/usr/freeware/bin/cpp -P -C -traditional -DIRIX64"
+	FREE_FORM="-freeform"
+        platform="IP19"
+        for platforms in IP19 IP20 IP21 IP22_4K IP22_5K \
+                         IP24 IP25 IP26 IP27 IP28 IP30 IP32_5K IP32_10K IP35
+        do
+          hinv -c processor | grep $platforms && platform=$platforms
+        done
+
+        PROCESSOR=" -r4000"
+        for processors in 4000 5000 8000 10000 12000 14000
+        do
+          hinv -c processor | grep $processors && PROCESSOR=" -r"$processors
+        done
+
+        hinv | grep R10000 && PGPLOT_DIR=" /am/father/u0/lazarus/pgplot/mypgplot \
+            -lpgplot64"
+
+        FLAGS_R="-64 -mips4"$PROCESSOR" -TARG:platform=$platform -Ofast=$platform -IPA \
+-LNO:vintr=on -OPT:alias=disjoint:fast_nint=off:roundoff=0:cray_ivdep=on:reorg_common=on"
+        FLAGS_R_DKES="-64 -mips4"$PROCESSOR" -TARG:platform=$platform -O1 \
+-LNO:vintr=on -OPT:Olimit=0:alias=disjoint:fast_nint=off:roundoff=0:cray_ivdep=on"
+#NOTE: -O2 WORKS FOR MOST OF CODE EXCEPT DKES_INPUT_PREPARE; ABOUT FACTOR 2 SLOWER
+	FLAGS_D="-g -C"
+	LOCAL_MAKE="gmake"
+	LIB="-lfastm -lblas"
+	NCARGSYM="f90 "$FLAGS_R
+	NCARGLIB="-L/usr/pppl/lib -lncarg -lncarg_gks -lncarg_c -lX11"
+	MPI_RUN="mpirun -np \$2 xstellopt \$1"
+	MPI_LIB=" -lmpi"
+if [ $MACHINE_ID = "hecate" ]
+then
+	NETCDF_DIREC="/usr/pppl"
+	NETCDF_INC=$NETCDF_DIREC/include
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	MPI_RUN="mpirun -np \$2 xstellopt \$1"
+	MPI_LIB=" -lmpi"
+	LIB="-lfastm -lblas"
+	NCARGLIB="-L/usr/pppl/lib -lncarg -lncarg_gks -lncarg_c -lX11"
+
+elif [ $MACHINE_ID = "jen50" ]
+then
+	HOME_LIB="/r6/fusion/jimenez/lib"
+	HOME_BIN="/r6/fusion/jimenez/bin"
+	HOME_INC="/r6/fusion/jimenez/include"
+	LIB="-lscs"
+
+#
+#     Uncomment the following lines to make a MPI version of the codes (SIESTA, STELLOPT)
+#
+	MPI_RUN="mpirun -np \$2 xstellopt \$1"
+	MPI_LIB=" -lmpi"
+	LIB="-L$HOME_LIB -lscalapack -lmpiblacs64 -lmpi -lscs_mp"
+#
+#       End of definitions for MPI version
+#
+
+	NETCDF_DIREC="/r2/fusion/guasp/netcdf-3.5.0/src"
+	NETCDF_INC=$NETCDF_DIREC/fortran
+	NETCDF_LIB=$NETCDF_DIREC/libsrc/$LIBNETCDF
+	NCARGLIB="-L/usr/local/ncarg/lib -lncarg -lncarg_gks -lncarg_c -lX11"
+	PGPLOT_DIR="$HOME_LIB/pgplot"
+	HDF5_SERIAL="$HOME_LIB"
+	HDF5_PAR="$HOME_LIB"
+	SILO_SERIAL="$HOME_LIB"
+	SILO_PAR="$HOME_LIB"
+	precomp=$precomp" -DSILO_AVAIL"
+	HDF5="$SILO_SERIAL/libsilo.a $HDF5_SERIAL/libhdf5.a -lsz -lm -lz"
+	COMPILE="f90 -I$HOME_INC"
+	COMPRESS="gzip"
+	ZIP="$HOME_BIN/zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="$HOME_BIN/unzip"
+fi
+	;;
+osf1)
+if [ $MACHINE_ID = "polaris.physics.umt.edu" ]
+then
+	precomp=$PREPROC"-DLANGUAGE_FORTRAN -DOSF1"
+	NETCDF_DIREC="/usr/local/netcdf-3.5.0"
+	NETCDF_INC=$NETCDF_DIREC/include
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+elif [ $MACHINE_ID = "falcon0" ]
+then
+	precomp=$PREPROC"-DOSF1 -DFALCON"
+	MPI_RUN="prun -N \$numnodes -n \$2 xstellopt \$1"
+	MPI_LIB="-lcxml -lmpi -lelan"
+	processors_per_node=4
+else
+	precomp=$PREPROC"-DOSF1"
+fi
+	LIB="-ldxml"
+	FLAGS_R="-O5 -speculate all -transform_loops -arch host -tune host -math_library fast"
+	FLAGS_D="-g -ladebug"
+	FREE_FORM="-free"
+	NCARGLIB="-L/usr/local/lib -lncarg -lncarg_gks -lncarg_c -lX11"
+	;;
+HPUX)
+if [ $MACHINE_ID = "gate1" ] || [ $MACHINE_ID = "gate3" ]
+then
+	precomp=$PREPROC"-DHPUX -DNEED_BLAS"
+	FREE_FORM="-f4"
+	FLAGS_R="-Chopt -sx5 -Wf,-M noflovf"
+	FLAGS_D="-g"
+	COMPILE="sxf90"
+	LINK="sxf90 -sx5"
+	ARCHIVE="sxar -ruv"
+else
+	precomp=$PREPROC"-DHPUX"
+	FLAGS_R="-O +U77 +FPdiuOVZ +FPdiuOVZ"
+	FLAGS_D="-g +U77 +FPdiuOVZ +FPdiuOVZ"
+	PRINTFLAG="+O3 +U77 +FPdiuOVZ"
+	LINK="f90 +U77 +FPdiuOVZ +FPdiuOVZ"
+	LIB="-lblas"
+fi
+	;;
+#linux or linux64
+linux*)
+	NETCDF_DIREC="/usr/local/netcdf-3.5.0"
+	COMPILE="lf95"
+	LINK="lf95 --staticlink"
+	FREE_FORM="--nfix"
+	FLAGS_R="--o2 -X9"
+	FLAGS_D="-g --chk a,e,s,u --chkglobal"
+	precomp=$PREPROC"-traditional -DLINUX -DNEED_BLAS"
+	PGLIB="/usr/local/pgplot/libpgplot.a"
+	PRINTFLAG="-O5"
+	NETCDF_INC=""
+if [ $MACHINE_ID = "sherlock.ph.utexas.edu" ] || [ $MACHINE_ID = "archive" ]
+then
+	LOCAL_MAKE="gmake"
+	COMPILE="ifort"
+	LINK="ifort"
+	FREE_FORM="-free"
+	FLAGS_R="-O"
+	FLAGS_D="-g"
+	precomp=$PREPROC"-traditional -DLINUX -DNEED_BLAS -DIFORT"
+	LIB="-lblas -llapack"
+	PREPROC="cpp -E -P -C "
+	FLAGS_R="-O2 -vec_report0"
+	NETCDF_DIREC="/usr/local/netcdf-3.6.0-p1"
+	LIBNETCDF="libnetcdf.a"
+	NETCDF_INC=$NETCDF_DIREC/include
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	COMPRESS="gzip" 
+	ZIP="zip" 
+	UNCOMPRESS="gunzip" 
+	UNZIP="unzip" 
+elif [ $MACHINE_ID = "fuslwd" ] 
+then
+	LIBNETCDF="libnetcdf.a"
+	NETCDF_DIREC="/usr/local/netcdf"
+	NETCDF_INC=$NETCDF_DIREC/include
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	COMPILE="ifort"
+	LINK="ifort -static"
+	FREE_FORM=""
+	FLAGS_R="-O"
+	FLAGS_D="-g --chk a,e,s,u --chkglobal"
+	precomp=$PREPROC"-traditional -DLINUX -DNEED_BLAS"
+	PGLIB="/usr/local/pgplot/libpgplot.a"
+	PRINTFLAG="-O5"
+	LIB="-L/usr/lib -llapack -lblas -L/usr/local/netcdf/lib -lnetcdf -lgfortran -lm"
+elif [ $MACHINE_ID = "greifswald" ]
+then
+	LOCAL_MAKE="gmake"
+	COMPILE="f95f"
+	LINK="f95f"
+	FREE_FORM="--nfix"
+	FLAGS_R="--dbl --f95 --info --o2 --tp4 --sse2 --zfm -x- --ntrace "
+	FLAGS_D="--chk a,e,s,u,x"
+	PREPROC=" "
+	NETCDF_DIREC="/usr/lib"
+	NETCDF_INC="/usr/include"
+	COMPRESS="gzip"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+elif [ $MACHINE_ID = "lxgeiger" ]
+then
+#       MY_HOME="/usr/local/f95i"
+	LIB="-lblas -llapack"
+	NETCDF_DIREC="/usr/local/lib"
+	COMPILE="gfortran"  
+	if [ $COMPILE = "g95" ]
+	then
+	  LIBNETCDF="libnetcdf.a"
+	  LINK="g95 -static"
+	elif [ $COMPILE = "f95i" ]
+	then
+	  LIBNETCDF="libnetcdf_f95i.a"
+	  LINK="f95i -static"
+	elif [ $COMPILE = "f95f" ]
+	then
+	  LIBNETCDF="libnetcdf_f95f.a"
+	  LINK="f95f --staticlink"
+	elif [ $COMPILE = "gfortran" ]
+	then
+	  NETCDF_DIREC="/home/geiger/Downloads/binary-netcdf-3.6.3_nc3_gfortran_gfortran"
+	  NETCDF_INC=$NETCDF_DIREC/include
+	  LIBNETCDF="libnetcdf.a"
+	  NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	  LINK="gfortran -static-libgfortran"
+	  echo "lxgeiger:"
+	  echo "$NETCDF_DIREC"
+	  echo "$NETCDF_INC"
+	  echo "$LIBNETCDF"
+	  echo "$NETCDF_LIB"
+	  echo "$LINK"
+	else
+	  exit
+	fi
+	FLAGS_R="-O3"
+	NCARGSYM="$COMPILE $NCAR"
+	FREE_FORM=" "
+	COMPRESS="gzip -S .Z"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+elif [ $MACHINE_ID = "lxgeiger2" ]
+then
+	$ECHO "Found lxgeiger2"
+	LOCAL_MAKE="gmake"
+	COMPILE="gfortran"
+	LINK="gfortran"
+	LIB="-lblas -llapack"
+#       FREE_FORM="-fno-fixed-form"
+	FREE_FORM=""
+#       FLAGS_R="-O3 -fdefault-real-8"
+#       FLAGS_D="-g -fdefault-real-8"
+	FLAGS_R="-O3"
+	FLAGS_D="-g"
+	PREPROC=" "
+	LIBNETCDF="libnetcdf.a"
+	NETCDF_DIREC="/home/geiger/Downloads/binary-netcdf-3.6.3_nc3_gfortran_gfortran"
+	NETCDF_INC="$NETCDF_DIREC/include"
+	NETCDF_LIB="$NETCDF_DIREC/lib/$LIBNETCDF"
+	COMPRESS="gzip"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+elif [ $MACHINE_ID = "euler01.ciemat.es" ] || [ $MACHINE_ID = "euler02.ciemat.es" ] 
+then 
+	LOCAL_MAKE="gmake"
+	COMPILE="ifort" 
+	LINK="ifort" 
+	#   LIB="-L/opt/intel/mkl/10.0.3.020/lib/em64t  -lmkl_lapack -lmkl -lguide -lpthread"
+	LIB="-L/opt/intel/mkl/10.0.3.020/lib/em64t  -lmkl_intel_lp64 -lmkl_sequential -lmkl_lapack -lmkl_core "
+	#   LIB="-L/opt/intel/mkl/10.0.3.020/lib/em64t  -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_lapack -lguide -lmkl_core -lpthread "
+	FREE_FORM="-free" 
+	FLAGS_R="-O3 " 
+	#  FLAGS_R="-O2 -vec-report0"
+	FLAGS_D="-g" 
+	PREPROC="cpp -E -P -C "
+	#  NETCDF_DIREC="/soft/netcdf-3.6.6" 
+	NETCDF_DIREC="/soft/netcdf-4.0.1-intel" 
+	COMPRESS="gzip" 
+	ZIP="zip" 
+	UNCOMPRESS="gunzip" 
+	UNZIP="unzip" 
+	precomp=$PREPROC"-traditional -DLINUX -DNEED_BLAS"
+elif [ $MACHINE_ID = "siesta.ornl.gov" ] || [ $MACHINE_ID = "swim.ornl.gov" ]
+then
+	SILO_SERIAL="/usr/src/silo060605"
+	SILO_PAR="/usr/local/silo/gfortran/parallel"
+	VISIT_DIR="/usr/local/visit/2.2.0/linux-x86_64"
+	COMPILE="gfortran -fno-realloc-lhs -I$SILO_SERIAL/include -I$FFTW_INC"
+	PGPLOT_DIR=""
+	PGALL=$PGPLOT_DIR" -lpgplot"
+	NETCDF_DIR=/usr
+	NETCDF_INC=$NETCDF_DIR/include
+	NETCDF_L=$NETCDF_DIR/lib64
+ 	NETCDF_LIB="-lnetcdff"
+	LINK=gfortran
+	HDF5="$SILO_SERIAL/lib/libsilo.a -lhdf5 -lz"
+	FFTW_LIB=usr/lib64
+	LAPACK_LIB="-llapack -lblas"
+
+#add these lines for mpi and add scalapack reference
+	precomp=$precomp" -DSKS -DSILO_AVAIL -DH5_USE_16_API"
+	MPI_COMPILE="mpif90 -fno-realloc-lhs -I$SILO_PAR/include -I$FFTW_INC"
+	MPI_LINK=mpif90
+	HDF5="$SILO_PAR/lib/libsilo.a -lhdf5 -lz"
+	SCALAPACK_PATH=-L/usr/lib64/scalapack-openmpi
+	SCALAPACK_LIB=$SCALAPACK_PATH" -lscalapack "
+	BLACS_PATH=-L/usr/lib64/openmpi/lib
+	BLACS_LIB=$BLACS_PATH" -lmpiblacs -lmpiblacsF77init"
+	LIB=$LAPACK_LIB
+#	LIB=$LIB" -L$FFTW_LIB -lfftw3"
+	FLAGS_R="-O3 -I../Sources"
+	FLAGS_D="-g -I../Sources"
+	FREE_FORM="" 
+elif [ "$nersc" = "hopper" ]
+then
+        COMPILE="ftn"
+        LINK="ftn"
+        FREE_FORM=""
+        LIB=""
+        FLAGS_R="-O2"
+        FLAGS_D="-g"
+        module load netcdf
+        precomp=$PREPROC"-traditional -DSILO_AVAIL -DH5_USE_16_API -DSKS"
+        HDF5="-L/usr/common/usg/silo/4.8/gcc/lib/ -lsiloh5 -lz"
+        NETCDF_DIREC="/opt/cray/netcdf/4.1.3/pgi/109"
+        NETCDF_INC="/opt/cray/netcdf/4.1.3/pgi/109/include"
+        NETCDF_LIB="-L/opt/cray/netcdf/4.1.3/pgi/109/lib -lnetcdff"
+        COMPRESS="gzip -S .Z"
+        ZIP="zip"
+        UNCOMPRESS="gunzip -S .Z"
+        UNZIP="unzip"
+        MPI_COMPILE="ftn"
+	MPI_LINK=$MPI_COMPILE
+elif [ "$nersc" = "carver" ]
+then
+	module load mkl
+	module load netcdf
+	COMPILE="mpif90"
+	LINK="mpif90"
+	FREE_FORM=""
+	LIB="$MKL -lmkl_lapack"
+	FLAGS_R="-fast"
+	FLAGS_D="-g"
+	NETCDF_DIREC="/usr/common/usg/netcdf/4.0.1"
+	NETCDF_INC="/usr/common/usg/netcdf/4.0.1/include"
+	NETCDF_LIB="-L/usr/common/usg/netcdf/4.0.1/lib -lnetcdf"
+	COMPRESS="gzip -S .Z"
+	ZIP="zip"
+	UNCOMPRESS="gunzip -S .Z"
+	UNZIP="unzip"
+elif [ $MACHINE_ID = "gongora.ornl.gov" ] || [ $MACHINE_ID = "quevedo.ornl.gov" ]
+then
+	NETCDF_DIREC="/usr/lib64"
+	LIBNETCDF="-lnetcdff -lnetcdf"
+	NETCDF_LIB="-L$NETCDF_DIREC $LIBNETCDF"
+	NETCDF_INC="/usr/include/netcdf-3"
+	COMPILE="gfortran"
+	LINK="gfortran"
+	FREE_FORM=""
+	FLAGS_R="-O3"
+	FLAGS_D="-g"
+	LIB="-llapack -lblas"
+	precomp=$PREPROC"-traditional -DLINUX -DNEED_BLAS"
+elif [ $MACHINE_ID = "gongora.lanl.gov" ] || [ $MACHINE_ID = "moscato.lanl.gov" ]
+then
+	NETCDF_DIREC="/usr/local/netcdf-3.5.0"
+	COMPILE="f90 -YEXT_NAMES=LCS -YEXT_SFX=_ -YCFRL=1"
+	LINK="f90 -w -YEXT_NAMES=LCS -YEXT_SFX=_ -YCFRL=1"
+	FREE_FORM=""
+	FLAGS_R="-O"
+	FLAGS_D="-g"
+	LIB="-llapack -lblas -lU77"
+	precomp=$PREPROC"-traditional -DLINUX -DNEED_BLAS"
+	MODULE_PATH="-p"
+elif [ $MACHINE_ID = "smokylogin1" ]
+then
+#	ADD -DMPI_OPT for MPI SCALAPACK run
+	precomp=$PREPROC"-traditional -DLINUX -DSILO_AVAIL"
+	SILO_PAR="/ccs/home/vel/silo/silo-4.6.1"
+	COMPILE="mpif90 -I$SILO_PAR/include"
+	LINK="mpif90"
+	FLAGS_R="-fast"
+	FLAGS_D="-g"
+	FREE_FORM=""
+	LIB="\${SCALAPACK_LIB} \${LAPACK_LIB} \${BLASGOTO_LIB} \${BLACS_LIB} -L$SILO_PAR/lib -lsilo"
+	NETCDF_DIREC="/sw/smoky/netcdf/3.6.2/sl5.0_pgi7.1.5"
+	NETCDF_LIB="\${NETCDF_FLIB}"
+	HDF5="\${HDF5_FLIB}"
+elif [ $MACHINE_ID = "crpppc361" ]
+then
+	COMPILE="ifort"
+	LINK="ifort"
+	LIB="-L${MKL} -lmkl_lapack -lmkl -lguide -lpthread"
+	FLAGS_R="-O3"
+	FLAGS_D="-g"
+	FREE_FORM=""
+elif [ $MACHINE_ID = "rizzo1" ]
+then
+	COMPILE="ftn"
+	LINK="ftn"
+	FLAGS_R="-fastsse"
+	FLAGS_D="-g"
+	NETCDF_DIREC="/apps/netcdf/3.6.0/xt3_pgi60"
+elif [ $MACHINE_ID = "login32.unicc.chalmers.se" ]
+then
+	LOCAL_MAKE="gmake"
+	COMPILE="pgf90"
+	LINK="pgf90"
+	FREE_FORM=""
+	FLAGS_R="-O2"
+	FLAGS_D="-g"
+
+#Italian computers
+elif [ $MACHINE_ID = "RA1" ] || [ $MACHINE_ID = "RA2" ] || [ $MACHINE_ID = "RA3" ]
+then
+	FLAGS_R="-O2 --nli --trace --tp"
+	LIB="-L/usr/local/lf9562/lib -lfj9i6 -lfj9f6 -lfj9e6 -lfccx86_6a \
+                /usr/lib/gcc-lib/i386-redhat-linux/3.2.3/libg2c.a \
+                /usr/lib/gcc-lib/i386-redhat-linux7/2.96/libgcc.a \
+                -L/usr/X11R6/lib -lXpm -lX11 -lXext \
+                /usr/local/lf95/lib/liblapackmt.a /usr/local/lf95/lib/libblasmt.a"
+	NETCDF_DIREC="/usr/netcdf"
+	NETCDF_LIB="/usr/netcdf/lib/libnetcdf.a"
+	COMPRESS="gzip"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+
+elif [ $MACHINE_ID = "ra22.igi.cnr.it" ] || [ $MACHINE_ID = "ra23.igi.cnr.it" ]
+then
+	FLAGS_R="-O2 -fpic -vec-report0"
+	FLAGS_D="-g -O0 -fpic -traceback -fpe0 -check all"
+	FREE_FORM=""
+	COMPILE="ifort"
+	LINK="ifort"
+	LIB="-L/usr/local/Ifortran/lib/intel64 -lifcore -lguide -lm  -lc -lpthread \
+					-L/usr/lib64 -lXpm -lX11 -lXext \
+                /usr/local/Ilapack/lib/em64t/libmkl_lapack.a"
+	NETCDF_DIREC="/usr/local/netcdf"
+	NETCDF_INC=$NETCDF_DIREC/include
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	MY_HOME=$HOME/bin64
+	HOME_BIN=$HOME/bin64
+	echo "MY_HOME=$MY_HOME"
+	echo "HOME_BIN=$HOME_BIN"
+	COMPRESS="gzip"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+
+elif [ "$beo_cluster" = "pppl" ]
+then
+#assumes want to use C3 if exists; else C2; else C1
+#put in a warning if NONE exists
+	C1=0 ; C2=0 ; C3=0
+	C1=`expr "$FC" : ".*/lfc"`
+	C2=`expr "$FC" : ".*/pgf90"`
+	C3=`expr "$FC" : ".*/pathf95"`
+	C4=`expr "$FC" : ".*/ifort"`
+	precomp="$precomp -DLINUX"
+	ECHO="echo"
+	if  [ $C3 != 0 ]
+	then
+	   # Updated for PPPL 1/27/11 -S. Lazerson
+	   COMPILE="pathf95"
+	   LINK="$COMPILE "
+	   FREE_FORM="-freeform"
+	   FLAGS_R="-w  -O2 -fno-second-underscore"
+	   FLAGS_D="-w  -g2  -ffortran-bounds-check -fno-second-underscore"
+           # For Pathscale $LAPACKHOME contains both libblas.a and liblapack.a
+	   LAPACK_DIREC=$LAPACKHOME
+           LAPACK_LIB=$LAPACK_DIREC
+           #LIB="-L$LAPACK_LIB -lblas -llapack"
+           LIB="$LAPACKHOME/liblapack.a $LAPACKHOME/libblas.a"
+           # Now $NETCDFHOME has both /lib and /include as subdirectories
+	   NETCDF_DIREC=$NETCDFHOME
+           LIBNETCDF="libnetcdf.a"
+           NETCDF_INC=$NETCDF_DIREC/include
+           # Note the second library -lnetcdff is needed for some reason
+           NETCDF_LIB="-L$NETCDF_DIREC/lib -lnetcdf -lnetcdff -I$NETCDF_INC"
+	elif  [ $C2 != 0 ]
+	then
+	   COMPILE="pgf90"
+	   LINK="$COMPILE -Bstatic"
+	   FREE_FORM="-Mfree"
+	   FLAGS_R="-O2 -fast -Mbackslash"
+	   FLAGS_D=" -C -g -Mbounds -Mchkfpstk -Mchkptr -Mchkstk -Mcoff -Mdwarf1  -Mdwarf2 -Melf -Mpgicoff -Mstabs "
+	   NETCDF_DIREC=$NETCDFHOME
+	   LIBNETCDF="libnetcdf.a"
+	   NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	   LIB="-llapack -lblas"
+	elif  [ $C1 != 0 ]
+	then
+	   # Updated for PPPL 1/27/11 -S. Lazerson
+	   COMPILE="lf95"
+	   LINK="$COMPILE --staticlink"
+	   FREE_FORM="--nfix"
+	   FLAGS_R="--o2 -X9"
+	   FLAGS_D="-g --chk a,e,s,u --chkglobal "
+           NETCDF_DIREC=$NETCDFHOME
+           NETCDF_INC=$NETCDF_DIREC/include
+           NETCDF_LIB="-L$NETCDF_DIREC/lib -lnetcdf -I$NETCDF_INC"
+           LIB="$LAPACKHOME/liblapack.a $LAPACKHOME/libblas.a"
+	elif  [ $C4 != 0 ]
+	then
+	   # Added by S. Lazerson 1/27/11
+	   COMPILE="ifort"
+	   LINK="$COMPILE"
+	   FREE_FORM="-free" 
+	   FLAGS_R="-O2 -vec_report0"
+	   FLAGS_D="-g" 
+	   LIBNETCDF="libnetcdf.a"
+	   NETCDF_DIREC=$NETCDFHOME
+	   NETCDF_INC=$NETCDF_DIREC/include
+	   # Need to link agains libimf and libm both
+	   NETCDF_LIB="-L$NETCDF_DIREC/lib -lnetcdf -lnetcdff -limf -lm -I$NETCDF_INC"
+	   LIB="-lblas -llapack"
+	else
+         $ECHO "None of C1-C3 compilers can be found: installation halted."; exit
+	fi
+
+#	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+#
+# NETCDF_LIB="" :
+# NEED TO AVPID THE DEFAULT APPENDAGE OF NETCDF_LIB TO LIB_LINK WHEN C & FORTRAN LIBS AEE SPLIT!
+#
+#	 if  [ $C1 = 0 ]; then NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF; fi
+        MPI_RUN="mpirun -np \$2 \$MY_HOME/xstellopt \$1"
+#ACTIVATE NEXT LINE TO TURN OFF MPI
+#	MPI_RUN=""
+	if [ ! -z "$MPI_RUN" ]
+	then
+	   MPI_COMPILE=`which mpif90`
+	   MPI_LINK=$MPI_COMPILE
+	fi
+
+elif [ $MACHINE_ID = "work20.ipp-hgw.mpg.de" ]
+then
+	NETCDF_DIREC="/usr"
+	LIBNETCDF="libnetcdf_f.a"
+	COMPILE="f95f"
+	LINK="f95f --staticlink"
+	COMPRESS="gzip"
+	ZIP="gzip"
+	UNCOMPRESS="gunzip"
+	UNZIP="gunzip"
+elif [ $MACHINE_ID = "bc-c1" ]
+then
+	NETCDF_DIREC="/usr"
+	LIBNETCDF="libnetcdf_f.a"
+	COMPILE="f95f"
+	LINK="f95f --staticlink"
+	COMPRESS="gzip -S .Z"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+elif [ $MACHINE_ID = "ipp_stel_cluster32" ]
+then
+	INTELVERSION=`env RZG_WRAPPER=silent f95i --version | grep ifort | cut -d" " -f 3 | sed -e"s/\.//"`
+	MY_HOME="/net/s01/${LOGNAME}/bin"
+	NETCDF_DIREC="/net/s01/stel/netcdf-3.6.2/intel${INTELVERSION}"
+	LIBNETCDF="libnetcdf.a"
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	COMPILE="f95i"
+	FREE_FORM=""
+	FIXED_FORM=""
+	FLAGS_R="-O3"
+	FLAGS_D="-g"
+	LIB="/net/s01/stel/lapack-3.2.1/intel${INTELVERSION}/lib/lapack.a /net/s01/stel/lapack-3.2.1/intel${INTELVERSION}/lib/blas.a"
+	LINK="f95i -static"
+	COMPRESS="gzip -S .Z"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+elif [ $MACHINE_ID = "ipp_stel_cluster64" ]
+then
+	INTELVERSION=`env RZG_WRAPPER=silent f95i --version | grep ifort | cut -d" " -f 3 | sed -e"s/\.//"`
+	uname -a | grep x86_64 && MYARCH="-em64t-tcpip"
+	MY_HOME="/net/s01/${LOGNAME}/bin"
+	NETCDF_DIREC="/net/s01/stel/netcdf-3.6.2/intel${INTELVERSION}${MYARCH}"
+	LIBNETCDF="libnetcdf.a"
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	COMPILE="f95i"
+	FREE_FORM=""
+	FIXED_FORM=""
+	FLAGS_R="-O3"
+	FLAGS_D="-g"
+	LIB="/net/s01/stel/lapack-3.2.1/intel${INTELVERSION}${MYARCH}/lib/lapack.a /net/s01/stel/lapack-3.2.1/intel${INTELVERSION}${MYARCH}/lib/blas.a"
+	LINK="f95i -static"
+	COMPRESS="gzip -S .Z"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+elif [ $MACHINE_ID = "pc2geiger.ipp-hgw.mpg.de" ]
+then
+	NETCDF_DIREC="/usr"
+	LIBNETCDF="libnetcdf_f.a"
+	COMPILE="f95f"
+	LINK="f95f --staticlink"
+	COMPRESS="gzip -S .Z"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+elif [ $MACHINE_ID = "lapgeiger" ]
+then
+	NETCDF_DIREC="/usr"
+	LIBNETCDF="libnetcdf_f.a"
+	COMPILE="ifc -Vaxlib"
+	LINK="ifc -Vaxlib"
+	FREE_FORM=" "
+	FLAGS_R="-O"
+	COMPRESS="gzip -S .Z"
+	ZIP="zip"
+	UNCOMPRESS="gunzip"
+	UNZIP="unzip"
+elif [ `echo $MACHINE_ID | cut -b-5` = "lohan" ]
+then
+	NETCDF_DIREC="/usr/local"
+	LIBNETCDF="netcdf.a"
+elif [ $MACHINE_ID = "davinci" ]
+# For Davinci, module load intel mkl netcdf
+# will define INCLUDE NETCDF MKL NETCDF_DIR
+then
+        C1=0 ; C2=0 ; C3=0
+        C1=`expr "$FC" : ifort`
+        if  [ $C1 != 0 ]
+        then
+          COMPILE=$FC
+          LINK="$FC  $MKL"
+          FREE_FORM="-free"
+          FLAGS_R="-O3 -diag-disable remark $(INCLUDE) $(NETCDF)"
+          FLAGS_D="-g -check noarg_temp_created -error-limit 4 -diag-disable remark -nbs $INCLUDE $NETCDF"
+          NETCDF_DIREC=$NETCDF_DIR
+          LIBNETCDF="libnetcdf.a"
+          LIB="$MKL $NETCDF"
+        else
+         $ECHO "None of C1-C3 compilers can be found: installation halted."
+         $ECHO "Load a module for a fortran compiler - use module avail"
+         exit
+        fi
+# Eliminated logjam2, JDH 2008-08-28
+elif [ $MACHINE_ID = "logjam.gat.com" ]
+then
+#put in a warning if NONE exists
+	C1=0 ; C2=0 ; C3=0
+	C1=`expr "$FC" : /opt/pgi/linux86-64/10.1/bin/pgf90` 
+	C2=`expr "$FC" : /opt/intel/Compiler/11.1/059/bin/intel64/ifort`
+        C3=`expr "$FC" : /usr/bin/gfortran`
+        C1=`expr "$FC" : ".*/pgf90"` 
+        C2=`expr "$FC" : ".*/ifort"`
+        C3=`expr "$FC" : ".*/gfortran"`
+	precomp="$precomp -DLINUX"
+	ECHO="echo"
+	if  [ $C3 != 0 ]
+	then
+      COMPILE=$FC
+      LINK=$FC
+      FREE_FORM="-ffree-form"
+      FLAGS_R="-O2 "
+      FLAGS_D="-g -fbounds-check"
+      NETCDF_DIREC=$NETCDFHOME
+      LIBNETCDF="libnetcdf.a"
+      LIB="-L/usr/lib64 -llapack -lblas"
+      PGALL=$(PGLIB)
+	elif  [ $C2 != 0 ]
+	then
+	  $ECHO "FC: "$FC
+	  LINK=$FC
+	  FREE_FORM="-free"
+	  FLAGS_R="-O2  -diag-disable remark"
+	  FLAGS_D="-g -check noarg_temp_created -error-limit 4 -diag-disable remark -nbs"
+	  NETCDF_DIREC=$NETCDFHOME
+      SILO_DIR=/opt/local/ifc/silo
+      precomp=$precomp" -DSILO_AVAIL"
+	  LIBNETCDF="libnetcdf.a"
+	  ARCHIVE="/opt/intel/Compiler/11.1/059/bin/intel64/xiar -ruv"
+	  COMPILE=$FC" -I$SILO_DIR/include"
+	  LIB="-L/opt/intel/Compiler/11.1/059/lib/intel64 -llapack -lblas -L$SILO_DIR/lib -lsilo"
+	  BLACS_PATH=$MKL
+   	  SCALAPACK_LIB=$BLACS_PATH" -lmkl_scalapack_lp64"
+	  BLACS_LIB="-lmkl_blacs_intelmpi_lp64 -lmkl_intel_lp64"
+	  BLACS_LIB=$BLACS_LIB" -lmkl_sequential -lpthread" 
+
+	elif  [ $C1 != 0 ]
+	then
+	  $ECHO "FC: "$FC
+	  COMPILE=`basename $FC`
+	  COMPILE1=$COMPILE
+	  LINK="$COMPILE  -Bstatic "
+	  FREE_FORM="-Mfree"
+          FLAGS_R="-O2 -fast -Mbackslash"
+          FLAGS_D=" -C -g  -Mbackslash"
+          NETCDF_DIREC=$NETCDFHOME
+          LIBNETCDF="libnetcdf.a"
+          NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+          LIB="-L $F90HOME/lib -llapack -lblas"
+	else
+          $ECHO "None of C1-C3 compilers can be found: installation halted." 
+          $ECHO "Load a module for a fortran compiler - use module avail"
+          exit
+	fi
+
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	MPI_RUN="mpirun -np \$2 \$MY_HOME/xstellopt \$1"
+    [ -n $MPI_COMPILE ] && `module load mpich2`
+#END	 "logjam.gat.com" 
+
+elif [ "$jacquard" = "jacin" ]
+then
+	COMPILE="pathf90"
+	LINK="pathf90"
+	LIB="-L/usr/common/usg/acml/2.6.0/pathscale64/lib -lacml -lacml_mv"
+	FREE_FORM="-freeform"
+	FLAGS_R="-O2 -march=opteron"
+	NETCDF_DIREC=/usr/common/usg/netcdf/3.6.0
+	COMPRESS="gzip -S .Z"
+	ZIP="zip"
+	UNCOMPRESS="gunzip -S .Z"
+	UNZIP="unzip"
+elif [ $MACHINE_ID = "kiwi" ]
+then
+	NETCDF_DIREC=/usr/local
+	LIB="-lblas -llapack"
+	
+# Section for computers at Auburn University. JDH Added 2011-04-25
+#    Added recon2 2011-11-28
+#     (Converted from Solaris to Linux)
+elif [ $MACHINE_ID = "blast1" ] || [ $MACHINE_ID = "blast2" ] || [ $MACHINE_ID = "blast3" ] || [ $MACHINE_ID = "blast4" ] || [ $MACHINE_ID = "recon" ] || [ $MACHINE_ID = "recon2" ]
+then
+	   NETCDF_DIREC="/usr/lib"
+	   NETCDF_INC="/usr/include"
+#	   NETCDF_LIB=$NETCDF_DIREC/$LIBNETCDF
+	   LIBNETCDF="-lnetcdff -lnetcdf"
+	   NETCDF_LIB="-L$NETCDF_DIREC $LIBNETCDF"
+	   COMPILE="f95"
+#	   LINK="f95 --staticlink"
+	   LINK="f95"
+	   LIB=	LIB="-lblas -llapack"
+   	   FLAGS_R="-O3"
+	   FLAGS_D="-g"
+   	   FREE_FORM=""
+   	   COMPRESS="gzip -S .Z"
+   	   UNCOMPRESS="gunzip"
+
+#  gcc 4.4.3 at /usr/bin/f95
+# End of Section for computers at Auburn University.
+
+fi
+       	if [ -z "$NETCDF_INC" ]
+        then
+           NETCDF_INC=$NETCDF_DIREC/include
+        fi
+
+	;;
+SX-5)
+	precomp=$PREPROC"-DSX5 -USX -U_SX"
+	LIB="-lblas"
+	FREE_FORM="-f4"
+	FLAGS_R="-Chopt"
+	FLAGS_D="-g"
+	;;
+Sun)
+	AWK="nawk"
+	NETCDF_DIREC="/usr/local/netcdf-3.5.0/src"
+	PREPROC="/usr/ccs/lib/cpp -P -C "
+	precomp=$PREPROC"-DSUNOS"
+	LIB="-xlic_lib=sunperf"
+	FREE_FORM="-free"
+	if [ $MACHINE_ID = "tranquility" ]
+	then
+          FLAGS_R="-fast -O5 -xarch=v9a -dalign -xlibmopt"
+	else
+          FLAGS_R="-fast -O5 -xarch=v8plusa -dalign -xlibmopt"
+	fi
+# Comment out information about Auburn University Solaris machines, 2011-04-25
+#	if [ $MACHINE_ID = "minilla" ]
+#	then
+#         NETCDF_DIREC="/opt/local"
+# blast1-4.physics.auburn.edu, recon.physics.auburn.edu JDH
+#	elif [ $MACHINE_ID = "blast1" ] || [ $MACHINE_ID = "blast2" ] || [ $MACHINE_ID = "blast3" ] || [ $MACHINE_ID = "blast4" ] || [ $MACHINE_ID = "recon" ]
+#	then
+##        NETCDF_DIREC="/opt/local"
+#         NETCDF_DIREC="/usr"
+#         FLAGS_R="-fast -O4 -fsimple=0"
+#       fi
+	PRINTFLAG="-O5"
+	MODULE_PATH="-M"
+	NETCDF_INC=$NETCDF_DIREC/include
+	NETCDF_LIB=$NETCDF_DIREC/lib/$LIBNETCDF
+	;;
+
+axpvms)			#assume precompilation done on UNIX system
+        precomp=$PREPROC"-DVMS -DAXPVMS"
+	;;
+
+macosx)
+#
+#   These settings for MACOSX are for the Intel platform and assume that the ifort compiler
+#   has been installed. Also, the user must obtain the netcdf library, build it, and indicate
+#   its location using the NETCDF_DIREC variable. Finally, since stellopt assumes that lower
+#   and upper case characters can be distinguished in directory/file names, the user must
+#   perform this installation on a disk partition that has been formatted either as a MacOS
+#   Extended Case-Sensitive or UFS filesystem, rather than Apple's default MacOS Extended option.
+#   A simple way to create a UFS filesystem on the fly is first use the Disk Utility to create a
+#   "disk image" that is UFS formatted.  Double click this image to mount it. Then drag and drop
+#   all source code onto this image. Next, use the command line cd to /Volumes and then to the
+#   newly created UFS area.  Everytime the machine is rebooted, you will need to double click on
+#   the disk image to remount it, but all of the files should still be there.
+
+	PREPROC="cpp -E -P -C "
+	FLAGS_R="-O2 -vec-report0"
+	FLAGS_D="-g"
+	FREE_FORM="-free"
+	MKLPATH="/Library/Frameworks/Intel_MKL.framework/Versions/Current/lib/em64t"
+	MKLINCLUDE="/Library/Frameworks/Intel_MKL.framework/Versions/Current/include"
+	MKLFLAG="-L$MKLPATH -I$MKLINCLUDE -lmkl_intel_lp64 -lmkl_lapack -lmkl_sequential -lmkl_core -lpthread"
+	LIBNETCDF="libnetcdf.a"
+	NETCDF_DIREC="/Users/dsp/Applications/netcdf-4.0.1_install"
+	NETCDF_INC=$NETCDF_DIREC/include
+	NETCDF_LIB="$NETCDF_DIREC/lib/$LIBNETCDF $MKFLAG"
+	precomp=$PREPROC"-DMACOSX -DNEED_BLAS -DIFORT"
+	COMPILE="ifort"
+	LINK="ifort"
+	ARCHIVE="ar -ruvs"
+	processors_per_node=1
+	LIB="$MKLFLAG"
+	MPI_LINK=""
+	MPI_COMPILE=""
+	MPI_RUN=""
+	MPI_LIB=""
+	MACFLG="-o"
+	RANLIB="ranlib -c libstell.a"
+	;;
+
+
+vaxornl) 		#assume precompilation done on UNIX system
+        precomp=$PREPROC"-DVMS"
+	;;
+esac
+#---------------------------------------------------------------
+#   End platform identification
+#   Next, query user about type of update/distribution/make he desires
+#   First ascertain that the required installation ZIP file (stellinstall.zip)
+#   or compressed tar file (stellunix.tar.Z) exists in the current user directory. 
+#   "Unmask" dependency files that may already exist from prior installation.
+#   Set umask so ONLY the user and his group can read files (user can write to
+#   the "Sources" directory files, too...) but should NOT write over certain 
+#   "make" files and object-file listings.
+#---------------------------------------------------------------
+$ECHO
+if [ -s $ZIP_FILE ] 
+then
+    $ECHO "unzipping stellinstall"
+    $UNZIP -oqUu $ZIP_FILE
+    $UNZIP -aoqUu $ZIP_FILE README tarstell zipstell setup
+    UNZIP1="$UNZIP -Uaoq"
+    UNTAR=""
+elif [ -s stellunix.tar.Z ] || [ -s stellunix.tar ]
+then
+    if [ -s stellunix.tar.Z ]
+    then
+       $ECHO "uncompressing stellunix"
+       $UNCOMPRESS stellunix.tar.Z
+    fi
+    UNTAR="tar -xof stellunix.tar "
+    $UNTAR README tarstell
+    UNZIP1=""
+else
+    $ECHO "  The required distribution files (stellinstall.zip or stellunix.tar.Z) were NOT found"
+    $ECHO "  Installation will be halted"; exit
+fi
+
+chmod u+x setup
+#umask u=rwx,g=rx,o=
+umask 027
+find "." -name '*.dep' -exec chmod u+w {} \;
+
+$ECHO
+$ECHO '  Enter version type to make (release-R, debug-D) : '
+read v_in
+input=`echo $v_in | tr "[:lower:]" "[:upper:]"`
+if [ "$input" = 'D' ]
+then
+   VERSION="debug"
+else
+   VERSION="release"
+fi      
+
+#---------------------------------------------------------------
+#   Next, query user about executables to be made
+#---------------------------------------------------------------
+$ECHO
+$ECHO '  Specify project(s) to make from the following list: '
+$ECHO
+$ECHO '  all animec bd_match booz_xform bootsj bnorm cobra cobravmec coilopt'
+$ECHO '  descur dkes inductance j_invariant lib makegrid nbj neo nescoil pgplot'
+$ECHO '  pgprout poincare propack prout siesta stellopt vacopt vmec2000'
+$ECHO '  v3fita v3post v3rfun'
+$ECHO
+read v_in
+FILES_TO_MAKE=`echo $v_in | tr "[:upper:]" "[:lower:]"`
+if [ "$FILES_TO_MAKE" = "all" ]
+then
+   FILES_TO_MAKE="animec bd_match booz_xform bootsj bnorm cobra cobravmec coilopt descur dkes inductance j_invariant \
+    makegrid nbj neo nescoil pgplot pgprout poincare propack prout siesta vacopt vmec2000 v3fita v3post v3rfun stellopt"
+fi
+[ "$FILES_TO_MAKE" = "lib" ] && FILES_TO_MAKE=""
+
+#---------------------------------------------------------------
+#   Next, determine if NETCDF directory is there and netcdf.inc can be found
+#---------------------------------------------------------------
+$ECHO
+if [ -s $NETCDF_INC/netcdf.inc ] 
+then
+   NETCDF_EXISTS=TRUE
+   $ECHO
+   $ECHO '---------------------------------------'
+   $ECHO '  Netcdf files were located in' $NETCDF_INC
+   $ECHO '  Build with NETCDF-support? (default: y)'
+   $ECHO '---------------------------------------'
+   $ECHO '  y / n : '
+   read v_in
+   input=`echo $v_in | tr "[:lower:]" "[:upper:]"`
+   if [ "$input" = 'N' ]
+   then
+      USE_NETCDF=""
+      NETCDF_EXISTS=FALSE
+      NETCDF_LIB=""
+      $ECHO '   Compiling without netcdf-support!'
+   else
+      USE_NETCDF="-DNETCDF"
+      $ECHO '  Compiling with netcdf-support!'
+      precomp=$precomp" -DNETCDF"
+   fi      
+elif [ "$nersc" = "franklin" ]
+then
+      USE_NETCDF="-DNETCDF"
+      $ECHO '  Compiling with netcdf-support!'
+      precomp=$precomp" -DNETCDF"
+else
+   NETCDF_EXISTS=FALSE
+   NETCDF_LIB=""
+   $ECHO '  Netcdf files could not be found in the specified directory: '
+   $ECHO '  '$NETCDF_DIREC
+   $ECHO '  If this is the wrong directory, please stop setup now '
+   $ECHO '  and fix the NETCDF_DIREC variable in this setup script'
+fi
+
+#---------------------------------------------------------------
+#   Next, determine if build should be with/without MPI if possible
+#---------------------------------------------------------------
+$ECHO
+precomp_nompi=$precomp
+if [ "$MPI_COMPILE" != "" ]
+then
+   $ECHO
+   $ECHO '---------------------------------------'
+   $ECHO '  MPI is available on this system      '
+   $ECHO '  Build selected applications with MPI enabled? (default: 'no')'
+   $ECHO '---------------------------------------'
+   $ECHO '  y / n : '
+   read v_in
+   if [ "$v_in" = 'y' ] || [ "$v_in" == 'Y' ]
+   then
+     LINK=$MPI_LINK
+     COMPILE=$MPI_COMPILE
+     LIB=$LIB" $SCALAPACK_LIB $BLACS_LIB"
+     precomp=$precomp" -DMPI_OPT"
+     $ECHO '  Compiling with MPI-support!'
+   else
+     MPI_LINK=""
+     MPI_COMPILE=""
+     $ECHO '  Compiling without MPI-support!'
+   fi     
+fi
+$ECHO
+#---------------------------------------------------------------
+#   Sort list and remove duplicate requests
+#---------------------------------------------------------------
+rm -f tempfile
+for name in $FILES_TO_MAKE
+do
+   $ECHO $name >> tempfile
+done
+#  JDH 2008-05-13
+#  Added '-r' option to sort
+#  Problem is that vmec2000 should be made before v3fita
+#  [ -f tempfile ] && FILES_TO_MAKE=`sort -u -f tempfile`
+[ -f tempfile ] && FILES_TO_MAKE=`sort -u -f -r tempfile`
+rm -f tempfile
+
+#---------------------------------------------------------------
+#   Create $MY_HOME directory for storing links to Stellarator executables.
+#   If user does not allow creation of this directory, terminate installation.
+#---------------------------------------------------------------
+if [ ! -d $MY_HOME ]
+then
+   $ECHO
+   $ECHO "  The directory $MY_HOME MUST be created to store links to Stellarator executables."
+   $ECHO "  Do you wish to create this directory (Y/N)?"
+   read PROCYN
+   if [ $PROCYN = 'y' ] || [ $PROCYN = 'Y' ]
+   then
+      $ECHO "  Be sure to add $MY_HOME to your path!"
+      $MKDIR $MY_HOME
+   else
+      $ECHO "  The installation will terminate now."
+      $ECHO "  Try again after creating $MY_HOME directory."
+      exit
+   fi
+fi
+
+#---------------------------------------------------------------
+#   awk_dep  converts the dependency file (*.dep)  into UNIX compatible form.
+#
+#   NOTE: QUOTES AROUND EOF CAN BE USED TO AVOID HAVING TO ESCAPE (\) ALL
+#   THE $ CHARACTERS. THIS WORKS ONLY WHEN THERE ARE NO SHELL SUBSTITUTIONS IN THE CAT-ED SCRIPT.
+#
+#   09-22-04: Removed tolower on file names. Make sure the name of the mod file in the
+#             .dsp file is the same as the *.f file name, then all will be fine EVEN with
+#             a mixture of caps, lower cases
+#---------------------------------------------------------------
+cat > awk_dep.awk << "EOF"
+#Written by S. P. Hirshman (02/26/02)
+#This script converts a Windows (compaq Fortran) generated dependency file
+#into UNIX readable form
+
+#Remove all occurences of .\Sources\..\ and .\Release\
+#Convert all WIN "\" to UNIX "/"
+#Change ".mod" with ".o" and ".f,.f90" to ".o"
+#Change ..\LIBSTELL to ../../LIBSTELL
+#Also, for V3FIT, will need to change ..\VMEC2000 to ../../VMEC2000
+#Later, will change "Release" to "Debug" as required
+#Eliminate tabs and "\" at end of each dependency group of lines
+
+BEGIN {ntabs = 0; nsource = 0}
+
+#Convert upper case *.mod files names into lower case
+$1 ~ /[A-Z]*\.mod/  { n = split ($1, path, "\\");
+mypath=""
+for (i = 1; i < n-1; i++) mypath = mypath sprintf("%s\\", path[i]);
+transtring = path[n-1]"\\";
+#transtring = tolower(path[n-1])"\\";
+$0 = "\t" mypath transtring;
+}
+
+#Lines with ONLY tabs separate dependency. Store previous line in TabLine array
+#so that continuation symbol (\) can be eliminated. Also, replace ALL tabs with 6 blanks
+{if ($0 == "\t") TabLine[++ntabs] = NR-1;  gsub(/\t/,"      ")}
+{sub(/\.f : /,".o : ")}
+{sub(/\.f90 : /,".o : ")}
+
+
+$1 ~ /\.\\Sources\\/ {n = split($1,path,"\\"); $0=path[n]" : \\"; SourceLine[++nsource] = NR}
+{sub(/\".\\Release\\/,"");  sub(/\.mod/,".o")}
+#{sub(/\"\.\.\\LIBSTELL\\Release\\/,"../../LIBSTELL/Release/")}
+#{sub(/\"\.\.\\VMEC2000\\Release\\/,"../../VMEC2000/Release/")}
+{sub(/\"\.\.\\/,"../../")}
+{sub(/\\Release\\/,"/Release/")}
+{sub(/\"\\/," \\")}
+{record[NR] = $0}
+
+#strip trailing "\" between on last dependency line for each source
+#strip netcdf.inc and eliminate entire source line record if that is the ONLY dependency line
+END {j = 1; k = 1; for (i = 1; i <= NR; i++) {
+    if (i == SourceLine[k])
+    {
+       k++; i1 = i+1
+       if (record[i1] ~ /netcdf.inc/)
+       {
+           if (i1 >= NR) exit;
+           if (i1 == TabLine[j]) {j++; i += 3}
+       }
+    }
+    if (i == TabLine[j]) {if (j < ntabs) j++; $0 = record[i]; gsub(/\\/,"");record[i] = $0}
+    if (record[i] !~ /netcdf.inc/) print record[i]}
+    }
+EOF
+
+#Written by S. P. Hirshman (01/23/08)
+#script for removing Debug *.f/*.f90 files if Sources version is newer
+cat > touch_debug << EOF
+#!/bin/sh
+cd Debug
+for file in *.f*
+do
+#   echo \$file
+   cd ..
+   file2=\`find Sources -name \$file\`
+   ! [ -f "\$file2" ] && continue
+   file3='Debug/'\$file
+#   echo 'file2: '\$file2 'file3: '\$file3
+   if [ \$file2 -nt \$file3 ]
+   then
+      rm \$file3
+   fi
+   cd Debug
+done
+EOF
+
+rm -f $MY_HOME/touch_debug
+chmod u+x touch_debug
+mv touch_debug $MY_HOME
+
+TOP_LEVEL_DIR=`pwd`
+
+#---------------------------------------------------------------
+#   Add "coilgeom" to FILES_TO_MAKE if "coilopt" is in FILES_TO_MAKE
+#   Add "descur_plot" to FILES_TO_MAKE if "descur"  in FILES_TO_MAKE
+#---------------------------------------------------------------
+    $ECHO $FILES_TO_MAKE | $AWK '$0 ~ /coilopt/ {sub(/coilopt/,"coilopt coilgeom")} \
+    $0 ~ /descur/ {sub(/descur/,"descur descur_plot")} {print $0};' > NEW_FILES
+    FILES_TO_MAKE=`cat NEW_FILES`
+    rm -f NEW_FILES
+    $ECHO "  Files to make: libstell "$FILES_TO_MAKE
+    $ECHO
+
+#---------------------------------------------------------------
+#   Begin for-do loop over FILES_TO_MAKE
+#   Note: lib MUST be first to be made for this to work properly...
+#---------------------------------------------------------------
+
+for FILES in libstell $FILES_TO_MAKE
+do
+  COMPILE1=$COMPILE
+  cd $TOP_LEVEL_DIR
+
+#---------------------------------------------------------------
+#   Check AIX Version and warn user
+#---------------------------------------------------------------
+    if [ "$FILES" = "vmec2000" ] && [ "$computer" = "risc6000" ]
+    then
+        AIX_VERSION=`what /usr/lpp/xlf/bin/xlfentry | grep -i version`
+        $ECHO
+        $ECHO "*********************************************************"
+        $ECHO "*                                                       *"
+        $ECHO "* WARNING: VMEC2000 REQUIRES AIX Version 8.0 OR GREATER *"
+        $ECHO "*          TO AVOID COMPILER BUG IN 2D PRECONDITIONER   *"
+        $ECHO "*                                                       *"
+        $ECHO "* PRESENT OS: "$AIX_VERSION
+        $ECHO "*                                                       *"
+        $ECHO "* USE make static_release OPTION ON ACCEPTABLE SYSTEM   *"
+        $ECHO "* IF YOUR OS IS OUT OF DATE                             *"
+        $ECHO "*                                                       *"
+        $ECHO "*********************************************************"
+        $ECHO
+        $ECHO "Press <return> to continue..."
+        read $junk
+    fi
+
+#---------------------------------------------------------------
+#   Set compiler, linker option flags here and default directories
+#   If user typed in "lib", ignore it since "libstell" is made instead
+#---------------------------------------------------------------
+  DIR=`echo $FILES | tr "[:lower:]" "[:upper:]"`
+
+  [ "$DIR" = "LIB" ] && continue
+  [ "$DIR" = "COILGEOM" ] && [ ! -d ./COILOPT ] && continue
+
+  EXE_FILE="x"$FILES
+  FLAGS_R0=$FLAGS_R
+  FLAGS_D0=$FLAGS_D
+  [ $DIR = "DKES" ] && [ $computer = "orig2000" ] && FLAGS_R0=$FLAGS_R_DKES
+  LIBRARY="libstell.a"
+  LINK_FILE=$LINK" \$(FLAGS) \$(SFLAGS) -o"
+  LINK_LIB="libstell.a $LIB"
+  MOD_PATH="$MODULE_PATH\$(MYHOME)/$LIBDIR"
+  BANNER_REL="Beginning release compilation and linking of $FILES"
+  BANNER_DBG="Beginning debug compilation and linking of $FILES"
+  actual_precomp=$precomp
+
+  case $FILES in
+  libstell)
+         EXE_FILE="libstell.a"
+         LINK_FILE=$ARCHIVE
+         MOD_PATH=""
+         BANNER_REL="Beginning release compilation and archiving of $FILES"
+         BANNER_DBG="Beginning debug compilation and archiving of $FILES"
+         [ -n "$MPI_COMPILE" ] && COMPILE1=$MPI_COMPILE
+  ;;
+  propack)   
+         EXE_FILE="propack.a"
+         LINK_FILE=$ARCHIVE
+         BANNER_REL="Beginning release compilation and archiving of $FILES"
+         BANNER_DBG="Beginning debug compilation and archiving of $FILES"
+         [ -n "$MPI_COMPILE" ] && COMPILE1=$MPI_COMPILE  
+  ;;
+  animec)
+$ECHO "$MPI_COMPILE"
+$ECHO "$MPI_LINK"
+$ECHO "$MPI_LIB"
+#with preconditioner, ask for 2Gb memory
+         [ $computer = "risc6000" ] && LINK_FILE=$LINK" \$(FLAGS) \$(SFLAGS) -bmaxdata:0x80000000 -o"
+  ;;
+  vmec2000)
+$ECHO "$MPI_COMPILE"
+$ECHO "$MPI_LINK"
+$ECHO "$MPI_LIB"
+#with preconditioner, ask for 2Gb memory
+         [ $computer = "risc6000" ] && LINK_FILE=$LINK" \$(FLAGS) \$(SFLAGS) -bmaxdata:0x80000000 -o"
+  ;;
+  coilopt)
+         [ -n "$MPI_COMPILE" ] && COMPILE1=$MPI_COMPILE
+         [ -n "$MPI_LINK" ] && LINK_FILE="$MPI_LINK \$(FLAGS) -o"
+         [ -n "$MPI_LIB" ] &&  LINK_LIB="$LINK_LIB $MPI_LIB"
+  ;;
+  coilgeom)
+         [ ! -d ./$DIR ] && $MKDIR ./$DIR
+         actual_precomp=$precomp_nompi" -DGEOM_ONLY"
+  ;;
+  descur)EXE_FILE="xcurve"
+  ;;
+  descur_plot)
+         EXE_FILE="xdes_plot"
+         LINK_FILE=$NCARGSYM" -o"
+         LINK_LIB="$LINK_LIB $NCARGLIB"
+  ;;
+  inductance)
+         EXE_FILE="xinduct"
+  ;;
+  makegrid)
+         EXE_FILE="xgrid"
+  ;;
+  stellopt)
+         [ -n "$MPI_COMPILE" ] && COMPILE1=$MPI_COMPILE
+         [ -n "$MPI_COMPILE" ] && MPI_LIB=""
+         [ -n "$MPI_LINK" ] && LINK_FILE="$MPI_LINK \$(FLAGS) -o"
+         [ -n "$MPI_LIB" ] &&  LINK_LIB="$LINK_LIB $MPI_LIB"
+  ;;
+  v3post)
+#         [ -n "$MPI_COMPILE" ] && COMPILE1=$MPI_COMPILE
+#         [ -n "$MPI_COMPILE" ] && MPI_LIB=""
+#         [ -n "$MPI_LINK" ] && LINK_FILE="$MPI_LINK \$(FLAGS) -o"
+#         [ -n "$MPI_LIB" ] &&  LINK_LIB="$LINK_LIB $MPI_LIB"
+ ;;
+  pgplot)
+   LINK_LIB=$PGALL
+  ;;
+  prout) DIR="PLOTTER"
+         LINK_FILE=$NCARGSYM" -o"
+         LINK_LIB="$LINK_LIB $NCARGLIB"
+  ;;  
+  pgprout)
+$ECHO PGPLOT_DIR=$PGPLOT_DIR
+   if [ ! -z "$PGALL" ]
+   then
+   PGLIB=${PGALL}
+   elif [ ! -z "$PGPLOT_DIR" ] && [ $computer == "linux" ]
+   then
+    PGLIB="${PGPLOT_DIR}/libpgplot.a  -L /usr/X11R6/lib -lX11 -L/usr/lib -ldl"
+   elif [ ! -z "$PGPLOT_DIR" ] && [ $computer == "linux64" ]
+   then
+   PGLIB=" -L${PGPLOT_DIR} -lpgplot -L/usr/X11R6/lib64 -lX11 -L/usr/lib64 -ldl"
+   fi
+   LINK_LIB="$LINK_LIB $PGLIB"
+   $ECHO PGLIB=$PGLIB
+   $ECHO LINK_LIB=$LINK_LIB
+  ;;
+  bd_match)
+   if [ ! -z "$PGALL" ]
+   then
+   PGLIB=${PGALL}
+   elif [ ! -z "$PGPLOT_DIR" ] && [ $computer == "linux" ]
+   then
+    PGLIB="${PGPLOT_DIR}/libpgplot.a  -L /usr/X11R6/lib -lX11 -L/usr/lib -ldl"
+   elif [ ! -z "$PGPLOT_DIR" ] && [ $computer == "linux64" ]
+   then
+   PGLIB=" -L${PGPLOT_DIR} -lpgplot -L/usr/X11R6/lib64 -lX11 -L/usr/lib64 -ldl"
+   fi
+         LINK_LIB="$LINK_LIB $PGLIB"
+  ;;
+
+  esac
+
+
+#---------------------------------------------------------------
+#   If $DIR == LIBSTELL exists, check if this should be a clean remake
+#---------------------------------------------------------------
+  CLEAN="dirty"
+  if [ "$DIR" = "LIBSTELL" ] && [ -d ./$DIR ]
+  then
+     $ECHO '  Specify a CLEAN MAKE (rebuilds existing .o files, even if they are not out of date)'
+     $ECHO '  or an ORDINARY MAKE (default) - (C/O): '
+     read v_in
+     if [ "$v_in" = 'c' ] || [ "$v_in" = 'C' ]
+     then
+        CLEAN="clean"
+     fi
+  fi
+#---------------------------------------------------------------
+#   The original UNZIP call (if executed) makes all the required directories.
+#   Alternatively, if using tar file, then untar this directory.
+#   First check if "clean" build is requested, then remove "Sources" files.
+#---------------------------------------------------------------
+   [ "$UNTAR" != "" ] && FILE_EXISTS=`tar -tf stellunix.tar $DIR`
+   CLEAN_LIBMAKE='N'
+   if [ "$CLEAN" = "clean" ] && [ -d ./$DIR ]
+   then
+      if [ "$DIR" = "LIBSTELL" ]
+      then
+         $ECHO
+         $ECHO '  Do you REALLY want a clean rebuild of the library (Y/N)?'
+         read v_in
+         CLEAN_LIBMAKE=`echo $v_in | tr "[:lower:]" "[:upper:]"`
+      fi
+      if [ "$CLEAN_LIBMAKE" = 'Y' ] || ([ "$DIR" != "LIBSTELL" ] && [ "$DIR" != "COILGEOM" ] \
+                                    && ([ "$FILE_EXISTS" != "" ] || [ "$UNZIP1" != "" ]))
+         then
+            SRC_DIR=`ls -F ./$DIR/Sources | grep /`
+            pwd=`pwd`
+            for directory in $SRC_DIR .
+            do
+               new_dir="./"$DIR"/Sources/"$directory
+               cd $new_dir
+               rm -f *.f *.f90
+               $ECHO "  Source files removed in directory "$new_dir
+               cd $pwd
+            done
+         fi
+   fi
+   [ "$UNTAR" != "" ] && $UNTAR $DIR
+
+#---------------------------------------------------------------
+#   If $DIR does not exist already, then there are no files,
+#   so branch back to top of this FOR loop.
+#---------------------------------------------------------------
+  if [ ! -d ./$DIR ]
+  then
+     $ECHO
+     $ECHO "  Directory "$DIR" does not exist."
+     $ECHO "  Continuing installation of other files..."
+     continue
+  fi
+
+#---------------------------------------------------------------
+#   Move to $DIR directory (one level below TOP_LEVEL_DIR)
+#   Add Release and Debug branches directory tree structure of $FILES
+#---------------------------------------------------------------
+$ECHO ">>>>>>>>>>>>> " COMPUTER      $computer
+$ECHO ">>>>>>>>>>>>> " MACHINE_ID    $MACHINE_ID
+$ECHO ">>>>>>>>>>>>> " PRECOMP       $precomp
+$ECHO ">>>>>>>>>>>>> " COMPILE       $COMPILE
+$ECHO ">>>>>>>>>>>>> " LINK          $LINK
+$ECHO ">>>>>>>>>>>>> " LINK_LIB      $LINK_LIB
+$ECHO ">>>>>>>>>>>>> " LIB           $LIB
+$ECHO ">>>>>>>>>>>>> " PGLIB         $PGLIB
+$ECHO ">>>>>>>>>>>>> " MPI_LINK      $MPI_LINK
+$ECHO ">>>>>>>>>>>>> " MPI_COMPILE   $MPI_COMPILE
+$ECHO ">>>>>>>>>>>>> " COMBINE       $combine
+$ECHO ">>>>>>>>>>>>> " FLAGS_R       $FLAGS_R0
+$ECHO ">>>>>>>>>>>>> " FLAGS_D       $FLAGS_D0
+$ECHO ">>>>>>>>>>>>> " EXE_FILE      $EXE_FILE
+$ECHO ">>>>>>>>>>>>> " NETCDF_DIREC  $NETCDF_DIREC
+$ECHO ">>>>>>>>>>>>> " INSTALL_DIR   $INSTALL_DIR
+$ECHO ">>>>>>>>>>>>> " FILES_TO_MAKE $files_to_make
+
+  cd ./$DIR
+
+  $ECHO
+  [ ! -d ./Debug ] && ($MKDIR ./Debug && $ECHO "  Creating $DIR/Debug")
+  [ ! -d ./Release ] && ($MKDIR ./Release && $ECHO "  Creating $DIR/Release")
+
+  if [ "$DIR" = "COILGEOM" ]
+  then
+     cd Release;  rm -f COILGEOM.dep; ln -fs ../../COILOPT/Release/COILOPT.dep COILGEOM.dep
+     cd ../Debug; rm -f COILGEOM.dep; ln -fs ../../COILOPT/Debug/COILOPT.dep COILGEOM.dep
+     cd ..
+
+  elif [ "$UNZIP1" != "" ]
+  then
+     if [ ! -f $DIR.zip ]
+     then
+        $ECHO $DIR".zip file not found"; continue
+     fi
+
+#---------------------------------------------------------------
+#   Check integrity of zip archive
+#---------------------------------------------------------------
+     if ! $UNZIP -Ut -qq $DIR.zip
+     then
+        $ECHO "$DIR.zip archive is corrupt: get new archive before continuing installation"
+        exit
+     else
+        $UNZIP1 $DIR.zip
+	  $ECHO "Unzipping: $UNZIP1 $DIR.zip"
+#       MAKE SURE ALL CR/LF ARE PROPERLY ACCOUNTED FOR
+	  $ZIP -rq test Sources $DIR.dep
+	  $UNZIP1 test; rm test.zip
+     fi
+  fi
+
+#---------------------------------------------------------------
+#   Create V_PATH string for makefile VPATH (excluding CVS directories)
+#---------------------------------------------------------------
+  [ "$DIR" = "COILGEOM" ] && cd ../COILOPT
+  cd Release
+  S_PATH=`find ../Sources \( -type d -a ! -name "\CVS" \)`
+  V_PATH=`echo $S_PATH | sed -e s/" ..\/Sources"/":\\$(SPATH)"/g \
+                             -e s/"..\/Sources"/"\\$(SPATH)"/`
+  cd ..
+  SPATH="../Sources"
+  [ "$DIR" = "COILGEOM" ] && cd ../COILGEOM && SPATH="../../COILOPT/Sources"
+
+#---------------------------------------------------------------
+#   Convert Windows *.dep dependency files into UNIX compatible form
+#   Remove trailing "\" using sed
+#   Must replace "Release" with "Debug" paths in all files (except libstell).
+#   Give subsequent files r (x) privelege, but do not allow user to write to them.
+#
+#   If distribution is through a .tar file (preferred mode), the $DIR.dep
+#   does NOT exist in this directory so the awk below will NOT be performed. Rather,
+#   $DIR.dep is already in the Release and Debug directories
+#---------------------------------------------------------------
+  if [ "$DIR" != "COILGEOM" ] && [ -f $DIR.dep ]
+  then
+     rm -f tempfile
+     $AWK -f ../awk_dep.awk $DIR.dep > tempfile
+     chmod u-w tempfile
+     cp tempfile Release/$DIR.dep
+     rm -f $DIR.dep
+
+     if [ "$DIR" = LIBSTELL ]
+     then
+        mv tempfile Debug/LIBSTELL.dep
+     else
+        $AWK '$0 !~ /\Release\// {print $0}
+             $0 ~ /\/Release\// {sub(/Release/,"Debug"); print $0}' tempfile > $DIR.dep
+        chmod u-w $DIR.dep
+        mv $DIR.dep Debug
+     fi
+
+     rm -f tempfile
+  fi
+#---------------------------------------------------------------
+#   Generate ObjectList file containing all the object files (*.o) to be built
+#   Change suffixes *.f (and *.f90, free format) to *.o and add \ for line continuation
+#   (needed so makefile can read it). Remove the "\" from the final line.
+#   Note: MUST write the initial "find" to a file. Writing to a string will work
+#   ONLY if there are < 100 files (otherwise, awk will not be able to parse the fields).
+#---------------------------------------------------------------
+  if [ "$DIR" != "COILGEOM" ]
+  then
+     LIST_FILE=ObjectList
+     rm -f $LIST_FILE
+     $ECHO "ObjectFiles = \\" > $LIST_FILE
+     find ./Sources \( -name '*.f' -o -name '*.f90' \) -exec basename {} \; >> $LIST_FILE
+     $AWK '/\.f90/ {gsub(/\.f90/,".o")} \
+           /\.f/   {gsub(/\.f/,".o")} {records[NR] = $0} \
+           END {{print records[1]}; for (i = 2; i <= NR; i++) \
+            {if (i < NR) printf "%s \\\n",records[i];
+             else printf "%s \n",records[i]}}' $LIST_FILE > TEMP_FILE
+
+     mv TEMP_FILE $LIST_FILE
+     chmod u-w,og-rw $LIST_FILE
+  else
+     rm -f ObjectList; cp ../COILOPT/ObjectList .
+  fi
+
+#---------------------------------------------------------------
+#   Create primary make file (makefile) and place in $DIR
+#   Remove old one(s) first
+#---------------------------------------------------------------
+  $ECHO
+  $ECHO "  Creating make file in "$DIR
+  MAKEFILE=make$FILES
+  [ "$FILES" = "makegrid" ] && MAKEFILE="makemgrid"
+
+  rm -f makefile
+
+cat > makefile << EOF
+#Type "make release(debug)" at command line to make release(debug) version
+#DO NOT alter the directory structure or move this makefile (must be in first subdirectory below top_level_dir)
+  SHELL = /bin/sh
+  DBG = Debug
+  REL = Release
+  PWD1 = \`pwd\`
+  REL_PATH = \$(PWD1)/\$(REL)
+  DBG_PATH = \$(PWD1)/\$(DBG)
+  MOD1_PATH = $MOD_PATH
+  FLAGS_R = $FLAGS_R0
+  FLAGS_D = $FLAGS_D0
+  EXE_F = $EXE_FILE
+  MAKE = $MAKEFILE
+  MYHOME = $MY_HOME
+  LIB_DIR = \$(MYHOME)/$LIBDIR
+
+release:
+	@echo "$BANNER_REL"
+	@cd \$(REL); rm -f *.f *.f90 *.c; rm -f \$(MAKE); ln -fs ../\$(MAKE) .; $LOCAL_MAKE -f \$(MAKE) \$(EXE_F) FLAGS="\$(FLAGS_R) \$(MOD1_PATH)" TYPE="release" LOCTYPE="Release"
+	@rm -f \$(REL)\*.f; rm -f \$(REL)\*.f90
+	@rm -f \$(MYHOME)/\$(EXE_F)
+	@-(umask 022; rm -f \$(MYHOME)/\$(EXE_F); ln -fs \$(REL_PATH)/\$(EXE_F) \$(MYHOME) 2> /dev/null; umask 077)
+EOF
+if [ "$FILES" = "libstell" ]
+then
+cat >> makefile << EOF
+	@-(umask 022; rm -f \$(LIB_DIR); ln -fs \$(REL_PATH) \$(LIB_DIR) 2> /dev/null; umask 077)
+EOF
+fi
+cat >> makefile << EOF
+	@echo "Release version - $EXE_FILE - is now updated"
+	@echo "To free up space, delete all *.o files from Release"
+	@echo ""
+
+debug:
+	@echo "$BANNER_DBG"
+	@touch_debug
+	@cd \$(DBG); rm -f *.f90 *.c; rm -f \$(MAKE); ln -fs ../\$(MAKE) .; $LOCAL_MAKE -f \$(MAKE) \$(EXE_F) FLAGS="\$(FLAGS_D) \$(MOD1_PATH)" TYPE="debug" LOCTYPE="Debug"
+	@rm -f \$(MYHOME)/\$(EXE_F)
+	@-(umask 022; rm -f \$(MYHOME)/\$(EXE_F); ln -fs \$(DBG_PATH)/\$(EXE_F) \$(MYHOME) 2> /dev/null; umask 077)
+EOF
+if [ "$FILES" = "libstell" ]
+then
+cat >> makefile << EOF
+	@-(umask 022; rm -f \$(LIB_DIR); ln -fs \$(DBG_PATH) \$(LIB_DIR) 2> /dev/null; umask 077)
+EOF
+fi
+cat >> makefile << EOF
+	@echo "Debug version - $EXE_FILE - is now updated"
+	@echo "To free up space, delete all *.o files from Debug"
+	@echo ""
+
+clean_release:
+	@echo "CLEAN REMAKE IN PROGRESS"
+	@cd \$(REL); $LOCAL_MAKE -f \$(MAKE) clean
+	@$LOCAL_MAKE release
+
+clean_debug:
+	@echo "CLEAN REMAKE IN PROGRESS"
+	@cd \$(DBG); $LOCAL_MAKE -f \$(MAKE) clean
+	@$LOCAL_MAKE debug
+
+static_release:
+	@echo "MAKING STATIC (RELEASE) EXECUTABLE"
+	@cd \$(REL); rm -f *.f *.f90 *.c; rm -f \$(MAKE); ln -fs ../\$(MAKE) .; $LOCAL_MAKE -f \$(MAKE) \$(EXE_F) FLAGS="\$(FLAGS_R) \$(MOD1_PATH)" SFLAGS="$STATIC_FLAG" TYPE="release"
+	@rm -f \$(MYHOME)/\$(EXE_F)
+	@-(umask 022; rm -f \$(MYHOME)/\$(EXE_F); ln -fs \$(REL_PATH)/\$(EXE_F) \$(MYHOME) 2> /dev/null; umask 077)
+EOF
+if [ "$FILES" = "libstell" ]
+then
+cat >> makefile << EOF
+	@-(umask 022; rm -f \$(LIB_DIR); ln -fs \$(REL_PATH) \$(LIB_DIR) 2> /dev/null; umask 077)
+EOF
+fi
+cat >> makefile << EOF
+	@echo "Static Release version - $EXE_FILE - is now updated"
+	@echo "To free up space, delete all *.o files from Release"
+	@echo ""
+EOF
+
+chmod u+x-w makefile
+
+#---------------------------------------------------------------
+#   Create recursively-called make file (make$FILES) to go into 
+#   $DIR/Release  or $DIR/Debug directories
+#   Note: because some compilers do not recognize .f90 extension,
+#   the make file copies the *.f90 files to *.f and compiles them
+#   in free format
+#---------------------------------------------------------------
+rm -f $MAKEFILE
+FILE_FOR="'\$*''.f'"
+FILE_F90="'\$*''.f90'"
+FILE_C="'\$*''.c'"
+FILE_O="'\$*''.o'"
+
+if [ "$FILES" = "propack" ]
+then
+	cp Sources\/stat.h Release
+	cp Sources\/stat.h Debug
+fi
+
+if [ "$FILES" = "libstell" ] || [ "$FILES" = "propack" ]
+then
+#Make Library makefile
+cat > $MAKEFILE << EOF
+#This makefile goes in dirs Debug and Release (first level below $DIR)
+SHELL   = /bin/sh
+PRECOMP = $actual_precomp
+COMPILE = $COMPILE1 $FIXED_FORM
+COMPILE_FREE = $COMPILE1 $FREE_FORM
+FFILE   = $FILE_FOR
+CFILE   = $FILE_C
+F90FILE = $FILE_F90
+LINK    = $LINK_FILE
+CLEAN_ARCH = $RANLIB
+# HOME_BIN= $MY_HOME_BIN   # MY_HOME_BIN is not set!
+HOME_BIN= ${INSTALL_DIR}/bin
+MOD_PATH= $MODULE_PATH
+INC_PATH= -I$NETCDF_INC
+SPATH   = $SPATH
+
+#Contains list of source files (.o) and dependencies
+DEPLIST = $DIR.dep
+OBJLIST = ../ObjectList
+VPATH = $V_PATH
+
+#Includes source files and dependency list
+include \$(DEPLIST)
+include \$(OBJLIST)
+
+.SUFFIXES :
+.SUFFIXES : .f .f90 .o
+
+$EXE_FILE : \$(ObjectFiles) 
+	\$(LINK) \$@ \$(ObjectFiles)
+	\$(CLEAN_ARCH)
+
+#Compile object files defined in OBJLIST.
+.f.o :
+	@if grep -q '^#if' \$<; \\
+      then \\
+         cp \$< \$(CFILE); \\
+         echo '\$(PRECOMP) \$<'; \$(PRECOMP) \$(CFILE) \$(FFILE); \\
+         rm -f \$(CFILE); echo '\$(COMPILE) \$(FLAGS) \$(MOD_PATH).. -c \$<'; \\
+         \$(COMPILE) \$(FLAGS) \$(MOD_PATH).. -c \$(FFILE);\\
+      else \\
+         echo '\$(COMPILE) \$(FLAGS) \$(MOD_PATH). -c \$<'; \\
+         \$(COMPILE) \$(FLAGS) \$(MOD_PATH). -c \$< ; \\
+      fi
+
+.f90.o :
+	@if grep -q '^#if' \$<; \\
+      then \\
+         cp \$< \$(CFILE); \\
+         echo '\$(PRECOMP) \$<'; \$(PRECOMP) \$(CFILE) \$(F90FILE); \\
+         rm -f \$(CFILE); echo '\$(COMPILE_FREE) \$(FLAGS) \$(MOD_PATH).. \$(INC_PATH) -c \$<'; \\
+         \$(COMPILE_FREE) \$(FLAGS) \$(MOD_PATH).. \$(INC_PATH) -c \$(F90FILE);  \\
+      else \\
+         echo '\$(COMPILE_FREE) \$(FLAGS) \$(MOD_PATH). \$(INC_PATH) -c \$<'; \\
+         \$(COMPILE_FREE) \$(FLAGS) \$(MOD_PATH).. \$(INC_PATH) -c \$< ; \\
+      fi
+clean:
+	- rm -f *.o *.mod *.a
+EOF
+
+  else
+# making makexxxxxxx files that are driven by the file "makefile"
+
+cat > $MAKEFILE << EOF
+#This makefile goes in dirs Debug and Release (first level below $DIR)
+SHELL   = /bin/sh
+MYHOME  = \$(HOME)
+PRECOMP = $actual_precomp
+HOME_BIN= $MY_HOME
+EOF
+
+if [ "$FILES" = "v3fita" ]
+then
+# JDH 2008-05-13
+#   COMPILE1=$COMPILE1" -I\$(VMEC_DIR)/\$(LOCTYPE)"
+    COMPILE1=$COMPILE1" $MODULE_PATH\$(VMEC_DIR)/\$(LOCTYPE)"
+cat >> $MAKEFILE << EOF
+VMEC_DIR= ../../VMEC2000
+LIB_VMEC= libvmec.a
+LIB_LINK= \$(VMEC_DIR)/\$(LOCTYPE)/\$(LIB_VMEC) \$(HOME_BIN)/$LINK_LIB $NETCDF_LIB
+EOF
+elif [ "$FILES" = "siesta" ]
+then
+cat >> $MAKEFILE << EOF
+LIB_LINK= \$(HOME_BIN)/$LINK_LIB $NETCDF_LIB $HDF5
+EOF
+elif [ "$FILES" = "pgplot" ]
+then
+cat >> $MAKEFILE << EOF
+LIB_LINK= $LINK_LIB
+EOF
+elif [ "$FILES" != "propack" ]
+then
+cat >> $MAKEFILE << EOF
+LIB_LINK= \$(HOME_BIN)/$LINK_LIB $NETCDF_LIB
+EOF
+fi
+
+cat >> $MAKEFILE << EOF
+LIB     = $LIBRARY
+LIB_DIR = ../../LIBSTELL
+COMPILE = $COMPILE1 $FIXED_FORM
+COMPILE_FREE = $COMPILE1 $FREE_FORM
+FFILE   = $FILE_FOR
+CFILE   = $FILE_C
+F90FILE = $FILE_F90
+LINK    = $LINK_FILE
+MOD_PATH= $MODULE_PATH
+SPATH   = $SPATH
+
+#Contains list of source files (.o) and dependencies
+DEPLIST = $DIR.dep
+OBJLIST = ../ObjectList
+
+#Includes source files and dependency list
+include \$(DEPLIST)
+include \$(OBJLIST)
+VPATH = $V_PATH
+
+.SUFFIXES :
+.SUFFIXES : .f .f90 .o
+EOF
+
+if [ "$FILES" = "v3fita" ]
+then
+cat >> $MAKEFILE << EOF
+$EXE_FILE:  \$(LIB) \$(LIB_VMEC) \$(ObjectFiles)
+	\$(LINK) \$@ \$(ObjectFiles) \$(LIB_LINK)
+	@rm \$(VMEC_DIR)/\$(LOCTYPE)/\$(LIB_VMEC)
+EOF
+
+else
+cat >> $MAKEFILE << EOF
+$EXE_FILE:  \$(LIB) \$(ObjectFiles)
+	\$(LINK) \$@ \$(ObjectFiles) \$(LIB_LINK)
+EOF
+fi
+
+cat >> $MAKEFILE << EOF
+#Compile object files defined in OBJLIST.
+.f.o :
+	@if grep -q '^#if' \$<; \\
+      then \\
+         cp \$< \$(CFILE); \\
+         echo '\$(PRECOMP) \$<'; \$(PRECOMP) \$(CFILE) \$(FFILE); \\
+         rm -f \$(CFILE); echo '\$(COMPILE) \$(FLAGS) \$(MOD_PATH).. -c \$<'; \\
+         \$(COMPILE) \$(FLAGS) \$(MOD_PATH).. -c \$(FFILE); \\
+      else \\
+         echo '\$(COMPILE) \$(FLAGS) \$(MOD_PATH). -c \$<'; \\
+         \$(COMPILE) \$(FLAGS) \$(MOD_PATH). -c \$<; \\
+      fi
+
+.f90.o :
+	@if grep -q '^#if' \$<; \\
+      then \\
+         cp \$< \$(CFILE); \\
+         echo '\$(PRECOMP) \$<'; \$(PRECOMP) \$(CFILE) \$(F90FILE); \\
+         rm -f \$(CFILE); echo '\$(COMPILE_FREE) \$(FLAGS) \$(MOD_PATH).. -c \$<'; \\
+        \$(COMPILE_FREE) \$(FLAGS) \$(MOD_PATH).. -c \$(F90FILE); \\
+      else \\
+         echo '\$(COMPILE_FREE) \$(FLAGS) \$(MOD_PATH). -c \$<'; \\
+         \$(COMPILE_FREE) \$(FLAGS) \$(MOD_PATH).. -c \$<; \\
+      fi
+
+#Check that library files are current.
+\$(LIB) :
+	@cd \$(LIB_DIR); $LOCAL_MAKE \$(TYPE)
+
+clean:
+	- rm -f *.o *.mod
+EOF
+
+if [ "$FILES" = "v3fita" ]
+then
+cat >> $MAKEFILE << EOF
+
+#Construct vmec library.
+\$(LIB_VMEC) :
+	@cd \$(VMEC_DIR); $LOCAL_MAKE \$(TYPE); cd \$(LOCTYPE); ar -cruv libvmec.a *.o
+EOF
+fi
+
+  fi
+  chmod u+x-w $MAKEFILE
+#---------------------------------------------------------------
+#   Symbolically link $MAKEFILE to Debug, Release directories
+#---------------------------------------------------------------
+  rm -f ./Release/$MAKEFILE  ./Debug/$MAKEFILE
+  cd Release; ln -s ../$MAKEFILE .
+  cd ../Debug; ln -s ../$MAKEFILE .
+  cd ..
+
+#---------------------------------------------------------------
+#   Move input demo files (if any) and examples : ZIP will handle this automatically
+#---------------------------------------------------------------
+
+
+$ECHO
+$ECHO "  $DIR directory tree completed"
+$ECHO "  Type 'make release (debug)' to make a release (debug) version of $EXE_FILE"
+$ECHO
+$ECHO "  ======================================================================="
+$ECHO "  IMPORTANT: FOR STELLOPT (STELLARATOR OPTIMIZER) TO WORK PROPERLY"
+$ECHO
+$ECHO "  All spawnable subprocesses (executables) MUST be symbolically linked (ln -s)"
+$ECHO "  to the \$MY_HOME directory as follows:"
+$ECHO "           cd \$MY_HOME"
+$ECHO "           ln -s ABSOLUTE_PATH_TO_EXECUTABLE/executable_name ."
+$ECHO
+$ECHO "  NOTE: \$MY_HOME = $MY_HOME"
+$ECHO "        MUST be in your path for STELLOPT to work properly!"
+$ECHO "  ======================================================================="
+$ECHO
+$ECHO "  End $DIR creation loop"
+
+#---------------------------------------------------------------
+#   Run library makefile
+#---------------------------------------------------------------
+  if [ "$FILES" = "libstell" ]
+  then
+     if [ "$CLEAN" = "clean" ] && [ "$CLEAN_LIBMAKE" = 'Y' ]
+     then
+        make clean_$VERSION
+     else
+        make $VERSION
+     fi
+
+  else
+
+#---------------------------------------------------------------
+#   Run individual makefiles (Note: libstell.a MUST EXIST before
+#   these makefiles will work correctly)
+#---------------------------------------------------------------
+     if [ "$CLEAN" = "clean" ]
+     then
+        make clean_$VERSION
+     else
+        make $VERSION
+     fi
+  fi
+
+
+#---------------------------------------------------------------
+#   Create RUNOPT script and put it into STELLOPT directory
+#   This is used to run xstellopt interactively on MPI systems
+#---------------------------------------------------------------
+  if [ "$MPI_RUN" != "" ]
+  then
+     if [ "$FILES" = "stellopt" ]
+     then
+        [ -f runopt ] && rm runopt
+cat > runopt << EOF
+#!/bin/sh
+#USAGE: runopt \$1 \$2
+#\$1: name of input file
+#\$2: number of processors requested
+if [ ! -n \"\$2\" ]
+then
+   echo \"Usage: runopt <filename> <no processors>\"
+   exit [0]
+fi
+EOF
+        if `echo $MPI_RUN | grep -q 'nodes'`
+        then
+cat >> runopt << EOF
+if [ \"\$2\" -lt $processors_per_node ]
+then
+   proc_per_node=\$2
+else
+   proc_per_node=$processors_per_node
+fi
+ppn1=\`expr \$proc_per_node - 1\`
+numnodes=\`expr \$2 + \$ppn1\`
+numnodes=\`expr \$numnodes / \$proc_per_node\`
+EOF
+        fi
+
+     $ECHO $MPI_RUN >> runopt
+     $ECHO
+     $ECHO "  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+     $ECHO "  Use the RUNOPT script to execute xstellopt code interactively"
+     $ECHO "  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+     $ECHO
+     chmod u+x runopt
+     PWD1=`pwd`
+     rm -f $MY_HOME/runopt; ln -fs $PWD1/runopt $MY_HOME/runopt
+
+     fi
+  fi
+
+#---------------------------------------------------------------
+#   End for-do loop over FILES_TO_MAKE
+#---------------------------------------------------------------
+done
+
+#---------------------------------------------------------------
+#   Clean-up: make *.dep read only
+#---------------------------------------------------------------
+cd $TOP_LEVEL_DIR
+rm awk_dep.awk
+find "." -name '*.dep' -exec chmod u-w {} \;
+umask $INIT_UMASK
+chmod u+xw tarstell
+./tarstell
+[ -f stellunix.tar ] && $COMPRESS stellunix.tar

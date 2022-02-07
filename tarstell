@@ -1,0 +1,22 @@
+#!/bin/sh
+#Written by S. P. Hirshman (03/18/02)
+#Script to tar and compress files in the Stellarator directory tree on a UNIX machine
+TARIT="tar -uf stellunix.tar"
+
+tar -chvf stellunix.tar README setup zipstell tarstell
+
+for DIR in BNORM BOOTSJ BOOZ_XFORM COBRA COBRAVMEC COILOPT DESCUR DESCUR_PLOT DKES \
+INDUCTANCE J_INVARIANT PGPROUT LIBSTELL MAKEGRID NEO NESCOIL PLOTTER STELLOPT VACOPT VMEC2000 \
+V3RFUN V3POST V3FITA SIESTA
+do
+   if [ -d $DIR ] 
+   then
+      $TARIT $DIR/Sources
+      $TARIT $DIR/Debug/*.dep
+      $TARIT $DIR/Release/*.dep
+      [ -f readme.txt ] && $TARIT readme.txt
+   fi
+done
+
+compress stellunix.tar
+echo "stellunix.tar.Z is now available"

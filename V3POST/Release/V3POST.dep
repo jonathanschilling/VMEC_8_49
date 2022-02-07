@@ -1,0 +1,30 @@
+# Microsoft Developer Studio Generated Dependency File, included by V3POST.mak
+
+bivariate.o : \
+      ../../LIBSTELL/Release/stel_kinds.o 
+      
+
+spline_parm.o : \
+      ../../LIBSTELL/Release/stel_kinds.o 
+      
+
+v3post_rfun.o : \
+      ../../LIBSTELL/Release/stel_kinds.o 
+      
+
+spline.o : \
+      ../../LIBSTELL/Release/stel_kinds.o \
+      spline_parm.o 
+      
+
+v3post.o : \
+      ../../LIBSTELL/Release/ezcdf.o \
+      ../../LIBSTELL/Release/read_response_nompi.o \
+      ../../LIBSTELL/Release/read_wout_mod.o \
+      ../../LIBSTELL/Release/safe_open_mod.o \
+      ../../LIBSTELL/Release/stel_constants.o \
+      ../../LIBSTELL/Release/stel_kinds.o \
+      bivariate.o \
+      spline_parm.o \
+      ../../LIBSTELL/Release/v3post_rfun.o 
+      
