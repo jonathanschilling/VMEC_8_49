@@ -1,0 +1,58 @@
+#This makefile goes in dirs Debug and Release (first level below LIBSTELL)
+SHELL   = /bin/sh
+PRECOMP = cpp -P -C -traditional -DLINUX -DNEED_BLAS -DNETCDF
+COMPILE = gfortran 
+COMPILE_FREE = gfortran --nfix
+FFILE   = '$*''.f'
+CFILE   = '$*''.c'
+F90FILE = '$*''.f90'
+LINK    = ar -ruv
+CLEAN_ARCH = 
+# HOME_BIN=    # MY_HOME_BIN is not set!
+HOME_BIN= /home/jonathan/bin
+MOD_PATH= -I
+INC_PATH= -I/usr/include
+SPATH   = ../Sources
+
+#Contains list of source files (.o) and dependencies
+DEPLIST = LIBSTELL.dep
+OBJLIST = ../ObjectList
+VPATH = $(SPATH):$(SPATH)/Linpack:$(SPATH)/Modules:$(SPATH)/Coils:$(SPATH)/FFTpack:$(SPATH)/Lsode:$(SPATH)/GMRes:$(SPATH)/Ezcdf:$(SPATH)/SVDpack:$(SPATH)/Track:$(SPATH)/QMRpack:$(SPATH)/Miscel:$(SPATH)/Lapack:$(SPATH)/Optimization
+
+#Includes source files and dependency list
+include $(DEPLIST)
+include $(OBJLIST)
+
+.SUFFIXES :
+.SUFFIXES : .f .f90 .o
+
+libstell.a : $(ObjectFiles)
+	$(LINK) $@ $(ObjectFiles)
+	$(CLEAN_ARCH)
+
+#Compile object files defined in OBJLIST.
+.f.o :
+	@if grep -q '^#if' $<; \
+      then \
+         cp $< $(CFILE); \
+         echo '$(PRECOMP) $<'; $(PRECOMP) $(CFILE) $(FFILE); \
+         rm -f $(CFILE); echo '$(COMPILE) $(FLAGS) $(MOD_PATH).. -c $<'; \
+         $(COMPILE) $(FLAGS) $(MOD_PATH).. -c $(FFILE);\
+      else \
+         echo '$(COMPILE) $(FLAGS) $(MOD_PATH). -c $<'; \
+         $(COMPILE) $(FLAGS) $(MOD_PATH). -c $< ; \
+      fi
+
+.f90.o :
+	@if grep -q '^#if' $<; \
+      then \
+         cp $< $(CFILE); \
+         echo '$(PRECOMP) $<'; $(PRECOMP) $(CFILE) $(F90FILE); \
+         rm -f $(CFILE); echo '$(COMPILE_FREE) $(FLAGS) $(MOD_PATH).. $(INC_PATH) -c $<'; \
+         $(COMPILE_FREE) $(FLAGS) $(MOD_PATH).. $(INC_PATH) -c $(F90FILE);  \
+      else \
+         echo '$(COMPILE_FREE) $(FLAGS) $(MOD_PATH). $(INC_PATH) -c $<'; \
+         $(COMPILE_FREE) $(FLAGS) $(MOD_PATH).. $(INC_PATH) -c $< ; \
+      fi
+clean:
+	- rm -f *.o *.mod *.a

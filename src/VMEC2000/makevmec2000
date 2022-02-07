@@ -1,0 +1,61 @@
+#This makefile goes in dirs Debug and Release (first level below VMEC2000)
+SHELL   = /bin/sh
+MYHOME  = $(HOME)
+PRECOMP = cpp -P -C -traditional -DLINUX -DNEED_BLAS -DNETCDF
+HOME_BIN= /home/jonathan/bin
+LIB_LINK= $(HOME_BIN)/libstell.a  /usr/local/lib/libnetcdf.a
+LIB     = libstell.a
+LIB_DIR = ../../LIBSTELL
+COMPILE = gfortran 
+COMPILE_FREE = gfortran --nfix
+FFILE   = '$*''.f'
+CFILE   = '$*''.c'
+F90FILE = '$*''.f90'
+LINK    = gfortran $(FLAGS) $(SFLAGS) -o
+MOD_PATH= -I
+SPATH   = ../Sources
+
+#Contains list of source files (.o) and dependencies
+DEPLIST = VMEC2000.dep
+OBJLIST = ../ObjectList
+
+#Includes source files and dependency list
+include $(DEPLIST)
+include $(OBJLIST)
+VPATH = $(SPATH):$(SPATH)/Reconstruction:$(SPATH)/TimeStep:$(SPATH)/NESTOR_vacuum:$(SPATH)/Input_Output:$(SPATH)/Initialization_Cleanup:$(SPATH)/General:$(SPATH)/Splines:$(SPATH)/Hessian
+
+.SUFFIXES :
+.SUFFIXES : .f .f90 .o
+xvmec2000:  $(LIB) $(ObjectFiles)
+	$(LINK) $@ $(ObjectFiles) $(LIB_LINK)
+#Compile object files defined in OBJLIST.
+.f.o :
+	@if grep -q '^#if' $<; \
+      then \
+         cp $< $(CFILE); \
+         echo '$(PRECOMP) $<'; $(PRECOMP) $(CFILE) $(FFILE); \
+         rm -f $(CFILE); echo '$(COMPILE) $(FLAGS) $(MOD_PATH).. -c $<'; \
+         $(COMPILE) $(FLAGS) $(MOD_PATH).. -c $(FFILE); \
+      else \
+         echo '$(COMPILE) $(FLAGS) $(MOD_PATH). -c $<'; \
+         $(COMPILE) $(FLAGS) $(MOD_PATH). -c $<; \
+      fi
+
+.f90.o :
+	@if grep -q '^#if' $<; \
+      then \
+         cp $< $(CFILE); \
+         echo '$(PRECOMP) $<'; $(PRECOMP) $(CFILE) $(F90FILE); \
+         rm -f $(CFILE); echo '$(COMPILE_FREE) $(FLAGS) $(MOD_PATH).. -c $<'; \
+        $(COMPILE_FREE) $(FLAGS) $(MOD_PATH).. -c $(F90FILE); \
+      else \
+         echo '$(COMPILE_FREE) $(FLAGS) $(MOD_PATH). -c $<'; \
+         $(COMPILE_FREE) $(FLAGS) $(MOD_PATH).. -c $<; \
+      fi
+
+#Check that library files are current.
+$(LIB) :
+	@cd $(LIB_DIR); make $(TYPE)
+
+clean:
+	- rm -f *.o *.mod

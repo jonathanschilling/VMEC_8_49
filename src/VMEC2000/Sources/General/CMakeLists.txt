@@ -1,0 +1,33 @@
+
+list (APPEND vmec_sources
+	${CMAKE_CURRENT_SOURCE_DIR}/alias.f
+	${CMAKE_CURRENT_SOURCE_DIR}/convert.f
+	${CMAKE_CURRENT_SOURCE_DIR}/fbal.f
+	${CMAKE_CURRENT_SOURCE_DIR}/vmec_persistent.f
+	${CMAKE_CURRENT_SOURCE_DIR}/realspace.f
+	${CMAKE_CURRENT_SOURCE_DIR}/vmec_main.f
+	${CMAKE_CURRENT_SOURCE_DIR}/totzsp_mod.f
+	${CMAKE_CURRENT_SOURCE_DIR}/bcovar.f
+	${CMAKE_CURRENT_SOURCE_DIR}/spectrum.f
+	${CMAKE_CURRENT_SOURCE_DIR}/residue.f90
+	${CMAKE_CURRENT_SOURCE_DIR}/getfsq.f
+	${CMAKE_CURRENT_SOURCE_DIR}/forces.f
+	${CMAKE_CURRENT_SOURCE_DIR}/directaccess.f90
+	${CMAKE_CURRENT_SOURCE_DIR}/tomnsp_mod.f
+	${CMAKE_CURRENT_SOURCE_DIR}/precondn.f
+	${CMAKE_CURRENT_SOURCE_DIR}/vmec_dim.f
+	${CMAKE_CURRENT_SOURCE_DIR}/lamfull.f
+	${CMAKE_CURRENT_SOURCE_DIR}/symforce.f
+	${CMAKE_CURRENT_SOURCE_DIR}/aspectratio.f
+	${CMAKE_CURRENT_SOURCE_DIR}/xstuff.f
+	${CMAKE_CURRENT_SOURCE_DIR}/jacobian.f
+	${CMAKE_CURRENT_SOURCE_DIR}/scalfor.f
+	${CMAKE_CURRENT_SOURCE_DIR}/lamcal.f90
+	${CMAKE_CURRENT_SOURCE_DIR}/funct3d.f
+	${CMAKE_CURRENT_SOURCE_DIR}/symrzl.f
+	${CMAKE_CURRENT_SOURCE_DIR}/vmec_params.f
+	${CMAKE_CURRENT_SOURCE_DIR}/add_fluxes.f90
+	${CMAKE_CURRENT_SOURCE_DIR}/csplinx.f
+	${CMAKE_CURRENT_SOURCE_DIR}/vforces.f
+)
+set (vmec_sources "${vmec_sources}" PARENT_SCOPE)
