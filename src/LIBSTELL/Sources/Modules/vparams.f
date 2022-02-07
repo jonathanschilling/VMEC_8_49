@@ -9,7 +9,7 @@
 !     MAXIMUM PARAMETERS FOR VMEC CODE (FOR READING INPUT)
 !     USER SHOULD NOT ALTER THESE
 !
-      INTEGER, PARAMETER :: nsd = 1001     !maximum number of radial nodes
+      INTEGER, PARAMETER :: nsd = 3001     !maximum number of radial nodes
       INTEGER, PARAMETER :: mpold = 101    !maximum number of poloidal harmonics (in r,z,lam fourier series)
       INTEGER, PARAMETER :: ntord = 101    !maximum number of toroidal harmonics
       INTEGER, PARAMETER :: ndatafmax  = 101
